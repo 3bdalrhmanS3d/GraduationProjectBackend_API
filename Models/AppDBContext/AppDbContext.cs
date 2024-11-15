@@ -17,26 +17,14 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         // onDelete: ReferentialAction.NoAction);
 
 
-        //  Update-Database -Context AppDbContext
-
-        public AppDbContext()
-        {
-
-        }
+        // Update-Database -Context AppDbContext
 
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
 
         }
 
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        {
-
-            optionsBuilder.UseSqlServer("Data Source=LAPTOP-3HFKTLSG\\SQL2022;Initial Catalog=GraduationProjectBackend_DB_API;Integrated Security=True;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Application Intent=ReadWrite;Multi Subnet Failover=False");
-            base.OnConfiguring(optionsBuilder);
-        }
-
-        //  User folder 
+        // User folder 
         public DbSet<User.Users> UsersT { get; set; }
         public DbSet<UserDetails> DetailsT { get; set; }
         public DbSet<UserVisitHistory> UserVisitHistoryT { get; set; }
