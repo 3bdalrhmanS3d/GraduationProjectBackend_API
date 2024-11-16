@@ -12,10 +12,8 @@ namespace GraduationProjectBackendAPI
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // 1. إضافة خدمات MVC
             builder.Services.AddControllers();
 
-            // 2. إعداد قاعدة البيانات
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             if (string.IsNullOrEmpty(connectionString))
             {
@@ -24,18 +22,16 @@ namespace GraduationProjectBackendAPI
 
             builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
 
-            // 3. إعداد CORS
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy("ReactAppPolicy", builder =>
+                options.AddPolicy("AllowAll", builder =>
                 {
-                    builder.WithOrigins("http://localhost:3000") // السماح فقط لعنوان تطبيق React
+                    builder.WithOrigins()
                            .AllowAnyHeader()
                            .AllowAnyMethod();
                 });
             });
 
-            // 4. إعداد الجلسات
             builder.Services.AddDistributedMemoryCache();
             builder.Services.AddSession(options =>
             {
@@ -44,7 +40,6 @@ namespace GraduationProjectBackendAPI
                 options.IdleTimeout = TimeSpan.FromMinutes(30);
             });
 
-            // 5. إعداد المصادقة باستخدام JWT
             builder.Services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = "JwtBearer";
@@ -64,7 +59,6 @@ namespace GraduationProjectBackendAPI
                 };
             });
 
-            // 6. إعداد Swagger لتوثيق الـ API
             builder.Services.AddSwaggerGen(c =>
             {
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -97,24 +91,20 @@ namespace GraduationProjectBackendAPI
 
             var app = builder.Build();
 
-            // 7. إعداد بيئة التطوير
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
 
-            // 8. إعداد Middleware
             app.UseHttpsRedirection();
             app.UseSession();
             app.UseAuthentication();
             app.UseCors("ReactAppPolicy");
             app.UseAuthorization();
 
-            // 9. تعيين الـ Endpoints
             app.MapControllers();
 
-            // 10. تشغيل التطبيق
             app.Run();
         }
     }
