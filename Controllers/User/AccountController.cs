@@ -167,14 +167,9 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (ModelState.IsValid)
             {
                 var existingUser = await _context.UsersT.Include(u => u.AccountVerification).SingleOrDefaultAsync(x => x.EmailAddress == userSignInInput.Email);
-                if (existingUser == null)
+                if (existingUser == null || existingUser.PasswordHash != HashPassword(userSignInInput.Password))
                 {
-                    return BadRequest("User does not exist. Please sign up.");
-                }
-
-                if (existingUser.PasswordHash != HashPassword(userSignInInput.Password))
-                {
-                    return BadRequest("Invalid email or password. Please try again.");
+                    return BadRequest("Invalid login credentials. Please try again.");
                 }
 
                 if (existingUser.AccountVerification != null && !existingUser.AccountVerification.CheckedOK)
@@ -191,15 +186,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 //HttpContext.Session.SetInt32("UID", existingUser.UserId);
                 //HttpContext.Session.SetString("FullName", $"{existingUser.FirstName} {existingUser.LastName}");
 
-                List<Claim> claims = new List<Claim>();
-                claims.Add(new Claim(ClaimTypes.NameIdentifier, existingUser.UserId.ToString()));
-                claims.Add(new Claim(ClaimTypes.Email, existingUser.EmailAddress.ToString()));
-                claims.Add(new Claim(ClaimTypes.Name, $"{existingUser.FirstName} {existingUser.LastName}") );
-
-                // إنشاء مفتاح التوقيع
-                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:SecretKey"]));
-                SigningCredentials signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
                 UserVisitHistory newSignIn = new UserVisitHistory
                 {
                     UserId = existingUser.UserId,
@@ -209,30 +195,52 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 _context.UserVisitHistoryT.Add(newSignIn);
                 await _context.SaveChangesAsync();
 
-                JwtSecurityToken mytoken = new JwtSecurityToken(
-                    issuer: _config["JWT:ValidIss"],
-                    audience: _config["JWT:ValidAud"],
-                    expires: DateTime.Now.AddHours(1),
-                    claims: claims,
-                    signingCredentials: signingCredentials
+                JwtSecurityToken mytoken = GenerateAccessToken(
+                    existingUser.UserId.ToString(),
+                    existingUser.EmailAddress,
+                    $"{existingUser.FirstName} {existingUser.LastName}"
                 );
 
                 var userResponse = new
                 {
                     token = new JwtSecurityTokenHandler().WriteToken(mytoken),
                     expired = mytoken.ValidTo,
-                    userId = existingUser.UserId,
-                    fullName = $"{existingUser.FirstName} {existingUser.LastName}",
-                    email = existingUser.EmailAddress,
                 };
 
                 return Ok(userResponse);
+
             }
             else
             {
-                return Unauthorized(new { message = "Invalid email or password." });
+                return Unauthorized(new { message = "Invalid login credentials." });
             }
         }
+
+        // Generating token based on user information
+        private JwtSecurityToken GenerateAccessToken(string userId, string email, string fullName)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId),
+                new Claim(ClaimTypes.Email, email),
+                new Claim(ClaimTypes.Name, fullName),
+                
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:SecretKey"]));
+            var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _config["JWT:ValidIss"],
+                audience: _config["JWT:ValidAud"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(6), 
+                signingCredentials: signingCredentials
+            );
+
+            return token;
+        }
+
 
         // Forget Password endpoint
         [HttpPost("forget-password")]
