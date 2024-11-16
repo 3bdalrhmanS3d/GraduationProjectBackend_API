@@ -17,6 +17,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
+
     [Route("api/[controller]")]
     [ApiController]
     public class AccountController : ControllerBase
@@ -29,132 +30,106 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _config = config;
         }
 
-        public class UserInput
-        {
-            [Required]
-            [StringLength(50)]
-            public string FirstName { get; set; }
-
-            [Required]
-            [StringLength(50)]
-            public string LastName { get; set; }
-
-            [Required]
-            [EmailAddress]
-            public string EmailAddress { get; set; }
-
-            [Required]
-            public string PasswordHash { get; set; }
-
-            [Required]
-            [Compare("PasswordHash", ErrorMessage = "The fields Password and PasswordConfirmation should be equals")]
-            public string userConfPassword { get; set; }
-        }
-
-        public class UserSignInInput
-        {
-            [Required(ErrorMessage = "Email Address is required.")]
-            [EmailAddress(ErrorMessage = "Invalid Email Address.")]
-            public string Email { get; set; }
-
-            [Required(ErrorMessage = "Password is required.")]
-            public string Password { get; set; }
-        }
-
-        public class UserFPInput
-        {
-            [Required(ErrorMessage = "Email is required.")]
-            [EmailAddress(ErrorMessage = "Invalid Email Address.")]
-            public string Email { get; set; }
-        }
-
-        // Sign up endpoint
-        [HttpPost("signup")]
+        [HttpPost("Signup")]
         public async Task<IActionResult> Signup([FromBody] UserInput userInput)
         {
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
-                var existingUserByEmail = await _context.UsersT.SingleOrDefaultAsync(x => x.EmailAddress == userInput.EmailAddress);
-                if (existingUserByEmail != null)
+                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+                return CreateResponse("Validation failed", "error", errors);
+            }
+
+            var existingUserByEmail = await _context.UsersT.SingleOrDefaultAsync(x => x.EmailAddress == userInput.EmailAddress);
+            if (existingUserByEmail != null)
+            {
+                if (existingUserByEmail.AccountVerification != null && existingUserByEmail.AccountVerification.CheckedOK)
                 {
-                    if (existingUserByEmail.AccountVerification != null && existingUserByEmail.AccountVerification.CheckedOK)
-                    {
-                        return BadRequest("User already exists and is verified.");
-                    }
-                    else
-                    {
-                        return BadRequest("User already exists. Please verify your email.");
-                    }
+                    return CreateResponse("User already exists and is verified.", "error");
                 }
                 else
                 {
-                    Users newUser = new Users
+                    if (existingUserByEmail.AccountVerification.Date.AddMinutes(30) < DateTime.UtcNow)
                     {
-                        FirstName = userInput.FirstName,
-                        LastName = userInput.LastName,
-                        EmailAddress = userInput.EmailAddress,
-                        PasswordHash = HashPassword(userInput.PasswordHash),
-                        CreatedAt = DateTime.UtcNow,
-                    };
+                        var newVerificationCode = GenerateVerificationCode();
+                        existingUserByEmail.AccountVerification.Code = newVerificationCode;
+                        existingUserByEmail.AccountVerification.Date = DateTime.UtcNow;
+                        await _context.SaveChangesAsync();
 
-                    _context.UsersT.Add(newUser);
-                    await _context.SaveChangesAsync();
-
-                    var verificationCode = new Random().Next(100000, 999999).ToString();
-                    AccountVerification accountVerification = new AccountVerification
-                    {
-                        UserId = newUser.UserId,
-                        Code = verificationCode,
-                        CheckedOK = false,
-                        Date = DateTime.UtcNow
-                    };
-                    _context.AccountVerificationT.Add(accountVerification);
-                    await _context.SaveChangesAsync();
-
-                    SendVerificationEmail(userInput.EmailAddress, verificationCode);
-                    // Save email in cookies
-                    Response.Cookies.Append("EmailForVerification", userInput.EmailAddress, new CookieOptions
-                    {
-                        HttpOnly = true,
-                        Expires = DateTime.UtcNow.AddMinutes(30) // Set expiration as per your requirement
-                    });
-
-                    return Ok("Registration successful. Please check your email for the verification code.");
+                        SendVerificationEmail(existingUserByEmail.EmailAddress, newVerificationCode);
+                    }
+                    return CreateResponse("User already exists. Please verify your email.", "error");
                 }
             }
-            else
+
+            Users newUser = new Users
             {
-                return BadRequest(ModelState);
-            }
+                FirstName = userInput.FirstName,
+                LastName = userInput.LastName,
+                EmailAddress = userInput.EmailAddress,
+                PasswordHash = HashPassword(userInput.PasswordHash),
+                CreatedAt = DateTime.UtcNow,
+            };
+
+            _context.UsersT.Add(newUser);
+            await _context.SaveChangesAsync();
+
+            var verificationCode = GenerateVerificationCode();
+
+            AccountVerification accountVerification = new AccountVerification
+            {
+                UserId = newUser.UserId,
+                Code = verificationCode,
+                CheckedOK = false,
+                Date = DateTime.UtcNow
+            };
+            _context.AccountVerificationT.Add(accountVerification);
+            await _context.SaveChangesAsync();
+
+            SendVerificationEmail(userInput.EmailAddress, verificationCode);
+
+            Response.Cookies.Append("EmailForVerification", userInput.EmailAddress, new CookieOptions
+            {
+                HttpOnly = true,
+                Expires = DateTime.UtcNow.AddMinutes(30)
+            });
+
+            return CreateResponse("Registration successful. Please check your email for the verification code.", "success");
         }
 
         // Verify Account endpoint
-        [HttpPost("verify-account")]
+        [HttpPost("Verify-account")]
         public async Task<IActionResult> VerifyAccount([FromBody] VerifyAccountInput input)
         {
-            // Retrieve email from cookies
             if (!Request.Cookies.TryGetValue("EmailForVerification", out string emailAddressFromCookies))
             {
-                return BadRequest("Verification email not found. Please register again.");
+                return CreateResponse("Verification email not found. Please register again.", "error");
             }
 
-            var user = await _context.UsersT.Include(u => u.AccountVerification).SingleOrDefaultAsync(u => u.EmailAddress == emailAddressFromCookies);
-            if (user != null && user.AccountVerification != null && user.AccountVerification.Code == input.VerificationCode)
+            var user = await _context.UsersT.Include(u => u.AccountVerification)
+                                            .SingleOrDefaultAsync(u => u.EmailAddress == emailAddressFromCookies);
+
+            if (user == null || user.AccountVerification == null)
             {
-                user.AccountVerification.CheckedOK = true;
-                await _context.SaveChangesAsync();
-
-                Response.Cookies.Delete("EmailForVerification");
-
-                return Ok("Account verification successful. You can now sign in.");
+                return CreateResponse("User not found or verification details missing.", "error");
             }
-            else
+
+            if (user.AccountVerification.Code != input.VerificationCode)
             {
-                return BadRequest("Invalid verification code. Please try again.");
+                return CreateResponse("Invalid verification code. Please try again.", "error");
             }
+
+            if (user.AccountVerification.Date.AddMinutes(30) < DateTime.UtcNow)
+            {
+                return CreateResponse("Verification code expired. Please request a new one.", "error");
+            }
+
+            user.AccountVerification.CheckedOK = true;
+            await _context.SaveChangesAsync();
+
+            Response.Cookies.Delete("EmailForVerification");
+
+            return CreateResponse("Account verification successful. You can now sign in.", "success");
         }
-
-
         public class VerifyAccountInput
         {
             [Required]
@@ -162,20 +137,22 @@ namespace GraduationProjectBackendAPI.Controllers.User
         }
 
         // Sign in endpoint
-        [HttpPost("signin")]
+        [HttpPost("Signin")]
         public async Task<IActionResult> Signin([FromBody] UserSignInInput userSignInInput)
         {
             if (ModelState.IsValid)
             {
                 var existingUser = await _context.UsersT.Include(u => u.AccountVerification).SingleOrDefaultAsync(x => x.EmailAddress == userSignInInput.Email);
-                if (existingUser == null || existingUser.PasswordHash != HashPassword(userSignInInput.Password))
+                if (existingUser == null || !VerifyPassword(userSignInInput.Password, existingUser.PasswordHash)
+)
                 {
                     return BadRequest("Invalid login credentials. Please try again.");
                 }
 
                 if (existingUser.AccountVerification != null && !existingUser.AccountVerification.CheckedOK)
                 {
-                    var newVerificationCode = new Random().Next(100000, 999999).ToString();
+                    var newVerificationCode = GenerateVerificationCode();
+
                     existingUser.AccountVerification.Code = newVerificationCode;
                     existingUser.AccountVerification.Date = DateTime.UtcNow;
                     await _context.SaveChangesAsync();
@@ -183,9 +160,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
                     SendVerificationEmail(existingUser.EmailAddress, newVerificationCode);
                     return BadRequest("Your account is not verified. A new verification code has been sent to your email.");
                 }
-
-                //HttpContext.Session.SetInt32("UID", existingUser.UserId);
-                //HttpContext.Session.SetString("FullName", $"{existingUser.FirstName} {existingUser.LastName}");
 
                 UserVisitHistory newSignIn = new UserVisitHistory
                 {
@@ -242,10 +216,9 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return token;
         }
 
-
         // Forget Password endpoint
         [HttpPost("forget-password")]
-        public async Task<IActionResult> ForgetPassword([FromBody] UserFPInput userFPInput)
+        public async Task<IActionResult> ForgetPassword([FromBody] UserForgetPassInput userFPInput)
         {
             if (ModelState.IsValid)
             {
@@ -255,7 +228,8 @@ namespace GraduationProjectBackendAPI.Controllers.User
                     return BadRequest("User does not exist with the provided email address.");
                 }
 
-                var verificationCode = new Random().Next(100000, 999999).ToString();
+                var verificationCode = GenerateVerificationCode();
+
                 SendVerificationEmail(user.EmailAddress, verificationCode);
                 return Ok("A verification code has been sent to your email address.");
             }
@@ -285,7 +259,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
                     if (jwtToken != null && jwtToken.ValidTo > DateTime.UtcNow)
                     {
-                        // إضافة الرمز إلى قائمة الحظر
                         var blacklistedToken = new BlacklistToken
                         {
                             Token = token,
@@ -314,7 +287,36 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
         }
 
+        [HttpPost("resend-verification-email")]
+        public async Task<IActionResult> ResendVerificationEmail()
+        {
+            if (!Request.Cookies.TryGetValue("EmailForVerification", out string emailAddressFromCookies))
+            {
+                return CreateResponse("Verification email not found. Please register again.", "error");
+            }
 
+            var user = await _context.UsersT.Include(u => u.AccountVerification)
+                                            .SingleOrDefaultAsync(u => u.EmailAddress == emailAddressFromCookies);
+
+            if (user == null || user.AccountVerification == null)
+            {
+                return CreateResponse("User not found or verification details missing.", "error");
+            }
+
+            if (user.AccountVerification.CheckedOK)
+            {
+                return CreateResponse("Account is already verified.", "error");
+            }
+
+            var newVerificationCode = GenerateVerificationCode();
+            user.AccountVerification.Code = newVerificationCode;
+            user.AccountVerification.Date = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            SendVerificationEmail(emailAddressFromCookies, newVerificationCode);
+
+            return CreateResponse("A new verification email has been sent.", "success");
+        }
 
         private void SendVerificationEmail(string emailAddress, string verificationCode)
         {
@@ -357,22 +359,30 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
         }
 
-
         private string HashPassword(string password)
         {
-            using (SHA256 sha256 = SHA256.Create())
+            return BCrypt.Net.BCrypt.HashPassword(password);
+        }
+
+        private bool VerifyPassword(string password, string hashedPassword)
+        {
+            return BCrypt.Net.BCrypt.Verify(password, hashedPassword);
+        }
+
+        private string GenerateVerificationCode()
+        {
+            return new Random().Next(100000, 999999).ToString();
+        }
+
+        private IActionResult CreateResponse(string message, string status, object data = null)
+        {
+            return Ok(new
             {
-                byte[] bytes = Encoding.UTF8.GetBytes(password);
-                byte[] hash = sha256.ComputeHash(bytes);
-
-                StringBuilder result = new StringBuilder();
-                foreach (byte b in hash)
-                {
-                    result.Append(b.ToString("x2"));
-                }
-
-                return result.ToString();
-            }
+                message,
+                status,
+                data
+            });
         }
     }
+
 }
