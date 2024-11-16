@@ -1,5 +1,7 @@
 ﻿using GraduationProjectBackendAPI.Models.AppDBContext;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace GraduationProjectBackendAPI
 {
@@ -28,6 +30,25 @@ namespace GraduationProjectBackendAPI
                 options.IdleTimeout = TimeSpan.FromMinutes(30);
             });
 
+            builder.Services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = "JwtBearer";
+                options.DefaultChallengeScheme = "JwtBearer";
+            })
+            .AddJwtBearer("JwtBearer", jwtOptions =>
+            {
+                jwtOptions.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = builder.Configuration["JWT:ValidIss"],
+                    ValidAudience = builder.Configuration["JWT:ValidAud"],
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:SecretKey"]))
+                };
+            });
+
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
@@ -43,7 +64,8 @@ namespace GraduationProjectBackendAPI
 
             app.UseSession();
 
-            app.UseAuthorization();
+            app.UseAuthentication(); 
+            app.UseAuthorization(); 
 
             app.MapControllers();
 

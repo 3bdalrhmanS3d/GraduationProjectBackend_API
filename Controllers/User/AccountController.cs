@@ -7,6 +7,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Text;
 using MimeKit;
+using Microsoft.AspNetCore.Authorization;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.AspNetCore.Http;
@@ -262,19 +263,57 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return BadRequest(ModelState);
         }
 
-        // POST: api/Logout
         [HttpPost("logout")]
+        [Authorize]
         public IActionResult Logout()
         {
-            HttpContext.Session.Clear();
-
-            foreach (var cookie in Request.Cookies.Keys)
+            try
             {
-                Response.Cookies.Delete(cookie);
-            }
+                HttpContext.Session.Clear();
 
-            return Ok(new { message = "User logged out and session and cookies cleared successfully." });
+                foreach (var cookie in Request.Cookies.Keys)
+                {
+                    Response.Cookies.Delete(cookie);
+                }
+
+                var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    var handler = new JwtSecurityTokenHandler();
+                    var jwtToken = handler.ReadJwtToken(token);
+
+                    if (jwtToken != null && jwtToken.ValidTo > DateTime.UtcNow)
+                    {
+                        // إضافة الرمز إلى قائمة الحظر
+                        var blacklistedToken = new BlacklistToken
+                        {
+                            Token = token,
+                            ExpiryDate = jwtToken.ValidTo
+                        };
+
+                        _context.BlacklistTokensT.Add(blacklistedToken);
+                        _context.SaveChanges();
+                    }
+                }
+
+                return Ok(new
+                {
+                    message = "Logout successful. Session and cookies cleared.",
+                    status = "success"
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error in Logout: " + ex.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    message = "An error occurred during logout.",
+                    status = "error"
+                });
+            }
         }
+
 
 
         private void SendVerificationEmail(string emailAddress, string verificationCode)

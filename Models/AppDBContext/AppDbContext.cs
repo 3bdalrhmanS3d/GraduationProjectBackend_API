@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using GraduationProjectBackendAPI.Models.User;
+using Microsoft.EntityFrameworkCore;
 
 namespace GraduationProjectBackendAPI.Models.AppDBContext
 {
@@ -29,5 +30,7 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<UserDetails> DetailsT { get; set; }
         public DbSet<UserVisitHistory> UserVisitHistoryT { get; set; }
         public DbSet<AccountVerification> AccountVerificationT { get; set; }
+        public DbSet<BlacklistToken> BlacklistTokensT { get; set; }
+
     }
 }
