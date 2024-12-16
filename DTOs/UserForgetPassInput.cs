@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace GraduationProjectBackendAPI.Controllers.User
+namespace GraduationProjectBackendAPI.DTOs
 {
     public class UserForgetPassInput
     {

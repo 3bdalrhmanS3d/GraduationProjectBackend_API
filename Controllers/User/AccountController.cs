@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
+using GraduationProjectBackendAPI.DTOs;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
@@ -357,11 +358,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
             {
                 Console.WriteLine("Exception caught in SendVerificationEmail: {0}", ex.ToString());
             }
-        }
-
-        private string HashPassword(string password)
-        {
-            return BCrypt.Net.BCrypt.HashPassword(password);
         }
 
         private bool VerifyPassword(string password, string hashedPassword)
