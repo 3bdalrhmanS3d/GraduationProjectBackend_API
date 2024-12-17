@@ -15,6 +15,8 @@ namespace GraduationProjectBackendAPI.Models.Courses
         public int LevelOrder { get; set; }
         public string LevelName { get; set; }
 
+        public string LevelDetails { get; set; }
+
         // Navigation Properties
         public virtual Courses Course { get; set; }
         public ICollection<Section>? Sections { get; set; }
