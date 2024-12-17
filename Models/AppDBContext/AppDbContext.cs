@@ -42,6 +42,8 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<UserProgress> UserProgresses { get; set; }
         public DbSet<CourseEnrollment> CourseEnrollments { get; set; }
         public DbSet<CourseReview> CourseReviews { get; set; }
+        public DbSet<AboutCourse> aboutCourses { get; set; }
+        public DbSet<CourseSkill> courseSkills { get; set; }
 
         
     }
