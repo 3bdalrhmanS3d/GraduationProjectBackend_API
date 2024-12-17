@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using GraduationProjectBackendAPI.Models.Courses;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -33,5 +34,9 @@ namespace GraduationProjectBackendAPI.Models.User
         public UserDetails UserDetails { get; set; }
         public ICollection<UserVisitHistory>? UserVisitHistories { get; set; }
         public AccountVerification AccountVerification { get; set; }
+        public ICollection<UserProgress> UserProgresses { get; set; }
+        public ICollection<CourseEnrollment> CourseEnrollments { get; set; }
+        public ICollection<CourseReview> CourseReviews { get; set; }
+
     }
 }
