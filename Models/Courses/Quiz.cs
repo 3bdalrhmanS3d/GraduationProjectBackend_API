@@ -13,6 +13,9 @@ namespace GraduationProjectBackendAPI.Models.Courses
         public int SectionId { get; set; } // Foreign Key
         public string QuizTitle { get; set; }
 
+        public virtual ICollection<Question> Questions { get; set; } = new List<Question>();
+        public virtual ICollection<UserAnswer> UserAnswers { get; set; } = new List<UserAnswer>();
+
         // Navigation Properties
         public virtual Section Section { get; set; }
     }

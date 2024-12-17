@@ -26,6 +26,7 @@ namespace GraduationProjectBackendAPI.Models.Courses
         public ICollection<UserProgress>? UserProgresses { get; set; }
         public ICollection<CourseEnrollment>? CourseEnrollments { get; set; }
         public ICollection<CourseReview>? CourseReviews { get; set; }
+        public ICollection<UserCoursePoints> userCoursePoints { get; set; }
 
     }
 }
