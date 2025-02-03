@@ -23,6 +23,7 @@ namespace GraduationProjectBackendAPI.Models.Courses
         public UserTaskStatus Status { get; set; } = UserTaskStatus.Pending; // Pending, Passed, Failed
         public string ReviewNotes { get; set; } // ملاحظات للمراجعة أو الرفض
 
+        public DateTime TaskSubmitAt { get; set; } // تاريخ تسليم الواجب
         // Navigation Properties
         public virtual Users User { get; set; }
         public virtual TaskT TaskT { get; set; }

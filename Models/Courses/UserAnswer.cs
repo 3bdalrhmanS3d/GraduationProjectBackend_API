@@ -19,6 +19,7 @@ namespace GraduationProjectBackendAPI.Models.Courses
         [ForeignKey("Question")]
         public int QuestionId { get; set; } // Foreign Key to Question
 
+        public string UserAnswerTime { get; set; } // الإجابة التي قدمها المستخدم، الخيار في حالة الأسئلة الاختيارية
         public string UserAnswerText { get; set; } // الإجابة التي قدمها المستخدم، النص في حالة الأسئلة المكتوبة
         public bool IsCorrect { get; set; } // هل الإجابة صحيحة؟
         public int Score { get; set; } // النقاط التي حصل عليها المستخدم للإجابة الصحيحة

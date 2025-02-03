@@ -12,7 +12,9 @@ namespace GraduationProjectBackendAPI.Models.Courses
         [ForeignKey("Section")]
         public int SectionId { get; set; } // Foreign Key
         public string TaskDescription { get; set; }
-        
+
+        public DateTime TaskCreateAt { get; set; }
+
         // Navigation Properties
         public virtual Section Section { get; set; }
         public ICollection<UserTask>? userTasks { get; set; }
