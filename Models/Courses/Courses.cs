@@ -28,5 +28,10 @@ namespace GraduationProjectBackendAPI.Models.Courses
         public ICollection<CourseReview>? CourseReviews { get; set; }
         public ICollection<UserCoursePoints> userCoursePoints { get; set; }
 
+        public ICollection<Payment>? Payments { get; set; }
+        public ICollection<CourseFeedback>? Feedbacks { get; set; }
+
+        public ICollection<FavoriteCourse> ? FavoriteCourses { get; set; }
     }
 }
+

@@ -38,8 +38,13 @@ namespace GraduationProjectBackendAPI.Models.User
         public ICollection<CourseEnrollment> CourseEnrollments { get; set; }
         public ICollection<CourseReview> CourseReviews { get; set; }
         public ICollection<UserAnswer> userAnswers { get; set; }
-
         public ICollection<UserCoursePoints> userCoursePoints { get; set; }
-
+        
+        public virtual ICollection<Payment>? Payments { get; set; } 
+        public virtual ICollection<UserLog>? UserLogs { get; set; } 
+        public virtual ICollection<AIChat>? AIChats { get; set; }
+        public virtual ICollection<CourseFeedback>? Feedbacks { get; set; }
+        public ICollection<FavoriteCourse>? FavoriteCourses { get; set; }
+        public virtual ICollection<Notification> Notifications { get; set; }
     }
 }

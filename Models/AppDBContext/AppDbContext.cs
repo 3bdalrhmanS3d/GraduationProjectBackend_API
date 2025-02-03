@@ -31,7 +31,10 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<UserVisitHistory> UserVisitHistoryT { get; set; }
         public DbSet<AccountVerification> AccountVerificationT { get; set; }
         public DbSet<BlacklistToken> BlacklistTokensT { get; set; }
+        public DbSet<UserLog> UserLogs { get; set; }
+        public DbSet<AIChat> AIChatT { get; set; }
 
+        public DbSet<Notification> NotificationT { get; set; }
         // Courses Platform Tables
         public DbSet<Courses.Courses> Courses { get; set; }
         public DbSet<Level> Levels { get; set; }
@@ -45,6 +48,10 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<AboutCourse> aboutCourses { get; set; }
         public DbSet<CourseSkill> courseSkills { get; set; }
         public DbSet<UserTask> UserTasks { get; set; }
+        public DbSet<Payment> Payments { get; set; }
+        public DbSet<CourseFeedback> CourseFeedbacks { get; set; }
+
+        public DbSet<FavoriteCourse> FavoriteCourses { get; set; }
         // DbSets for the existing models
 
         public DbSet<Question> Questions { get; set; }
@@ -52,7 +59,6 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<CorrectAnswer> CorrectAnswers { get; set; }
         public DbSet<UserAnswer> UserAnswers { get; set; }
         public DbSet<UserCoursePoints> UserCoursePoints { get; set; }
-
 
     }
 }

@@ -4,6 +4,7 @@ using GraduationProjectBackendAPI.Models.AppDBContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GraduationProjectBackendAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250203150547_init4")]
+    partial class init4
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -271,32 +273,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.HasIndex("CourseId");
 
                     b.ToTable("courseSkills");
-                });
-
-            modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.FavoriteCourse", b =>
-                {
-                    b.Property<int>("FavoriteId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FavoriteId"), 1L, 1);
-
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("CourseId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("FavoriteId");
-
-                    b.HasIndex("CourseId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("FavoriteCourses");
                 });
 
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.Level", b =>
@@ -673,34 +649,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.ToTable("BlacklistTokensT");
                 });
 
-            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.Notification", b =>
-                {
-                    b.Property<int>("NotificationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationId"), 1L, 1);
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsRead")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("NotificationId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("NotificationT");
-                });
-
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.UserLog", b =>
                 {
                     b.Property<int>("LogId")
@@ -934,25 +882,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Navigation("Courses");
                 });
 
-            modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.FavoriteCourse", b =>
-                {
-                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Courses", "Course")
-                        .WithMany("FavoriteCourses")
-                        .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
-                        .WithMany("FavoriteCourses")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Course");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.Level", b =>
                 {
                     b.HasOne("GraduationProjectBackendAPI.Models.Courses.Courses", "Course")
@@ -1133,17 +1062,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.Notification", b =>
-                {
-                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
-                        .WithMany("Notifications")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.UserLog", b =>
                 {
                     b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
@@ -1184,8 +1102,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Navigation("CourseReviews");
 
                     b.Navigation("CourseSkills");
-
-                    b.Navigation("FavoriteCourses");
 
                     b.Navigation("Feedbacks");
 
@@ -1249,11 +1165,7 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     b.Navigation("CourseReviews");
 
-                    b.Navigation("FavoriteCourses");
-
                     b.Navigation("Feedbacks");
-
-                    b.Navigation("Notifications");
 
                     b.Navigation("Payments");
 
