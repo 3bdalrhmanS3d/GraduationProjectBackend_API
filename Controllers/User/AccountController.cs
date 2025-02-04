@@ -136,60 +136,99 @@ namespace GraduationProjectBackendAPI.Controllers.User
             public string VerificationCode { get; set; }
         }
 
-        // Sign in endpoint
+        // Signin endpoint
+        private static Dictionary<string, (int Attempts, DateTime LockoutEnd)> _failedLoginAttempts = new();
+
         [HttpPost("Signin")]
         public async Task<IActionResult> Signin([FromBody] UserSignInInput userSignInInput)
         {
-            if (ModelState.IsValid)
-            {
-                var existingUser = await _context.UsersT.Include(u => u.AccountVerification).SingleOrDefaultAsync(x => x.EmailAddress == userSignInInput.Email);
-                if (existingUser == null || !VerifyPassword(userSignInInput.Password, existingUser.PasswordHash)
-)
-                {
-                    return BadRequest("Invalid login credentials. Please try again.");
-                }
-
-                if (existingUser.AccountVerification != null && !existingUser.AccountVerification.CheckedOK)
-                {
-                    var newVerificationCode = GenerateVerificationCode();
-
-                    existingUser.AccountVerification.Code = newVerificationCode;
-                    existingUser.AccountVerification.Date = DateTime.UtcNow;
-                    await _context.SaveChangesAsync();
-
-                    SendVerificationEmail(existingUser.EmailAddress, newVerificationCode);
-                    return BadRequest("Your account is not verified. A new verification code has been sent to your email.");
-                }
-
-                UserVisitHistory newSignIn = new UserVisitHistory
-                {
-                    UserId = existingUser.UserId,
-                    LastVisit = DateTime.UtcNow,
-                };
-
-                _context.UserVisitHistoryT.Add(newSignIn);
-                await _context.SaveChangesAsync();
-
-                JwtSecurityToken mytoken = GenerateAccessToken(
-                    existingUser.UserId.ToString(),
-                    existingUser.EmailAddress,
-                    $"{existingUser.FirstName} {existingUser.LastName}"
-                );
-
-                var userResponse = new
-                {
-                    token = new JwtSecurityTokenHandler().WriteToken(mytoken),
-                    expired = mytoken.ValidTo,
-                };
-
-                return Ok(userResponse);
-
-            }
-            else
+            if (!ModelState.IsValid)
             {
                 return Unauthorized(new { message = "Invalid login credentials." });
             }
+
+            string email = userSignInInput.Email;
+
+            // Lock verification 1️⃣ due to repeated failure attempts
+
+            if (_failedLoginAttempts.ContainsKey(email) && _failedLoginAttempts[email].LockoutEnd > DateTime.UtcNow)
+            {
+                return BadRequest($"Too many failed attempts. Try again after {_failedLoginAttempts[email].LockoutEnd - DateTime.UtcNow:mm\\:ss} minutes.");
+            }
+
+            // 2️ User search and password verification
+            var existingUser = await _context.UsersT.Include(u => u.AccountVerification)
+                                   .SingleOrDefaultAsync(x => x.EmailAddress == email);
+
+            if (existingUser == null || !VerifyPassword(userSignInInput.Password, existingUser.PasswordHash))
+            {
+                //Record attempt failure
+                if (!_failedLoginAttempts.ContainsKey(email))
+                {
+                    _failedLoginAttempts[email] = (1, DateTime.UtcNow);
+                }
+                else
+                {
+                    _failedLoginAttempts[email] = (_failedLoginAttempts[email].Attempts + 1, DateTime.UtcNow);
+                }
+
+                //If failed attempts exceed 5, the user is blocked for 15 minutes
+                if (_failedLoginAttempts[email].Attempts >= 5)
+                {
+                    _failedLoginAttempts[email] = (5, DateTime.UtcNow.AddMinutes(15));
+                    return BadRequest("Too many failed login attempts. You are locked out for 15 minutes.");
+                }
+
+                return BadRequest("Invalid login credentials.");
+            }
+
+            // 3️ Checking account activation status
+
+            if (existingUser.AccountVerification != null && !existingUser.AccountVerification.CheckedOK)
+            {
+                var newVerificationCode = GenerateVerificationCode();
+
+                existingUser.AccountVerification.Code = newVerificationCode;
+                existingUser.AccountVerification.Date = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                SendVerificationEmail(existingUser.EmailAddress, newVerificationCode);
+                return BadRequest("Your account is not verified. A new verification code has been sent to your email.");
+            }
+
+            //  4️ Reset attempts to fail when login is successful
+            if (_failedLoginAttempts.ContainsKey(email))
+            {
+                _failedLoginAttempts.Remove(email);
+            }
+
+            //  5️ User Visit Registration
+            UserVisitHistory newSignIn = new UserVisitHistory
+            {
+                UserId = existingUser.UserId,
+                LastVisit = DateTime.UtcNow,
+            };
+
+            _context.UserVisitHistoryT.Add(newSignIn);
+            await _context.SaveChangesAsync();
+
+            // 6️ JWT token generation and sending to user
+
+            JwtSecurityToken mytoken = GenerateAccessToken(
+                existingUser.UserId.ToString(),
+                existingUser.EmailAddress,
+                $"{existingUser.FirstName} {existingUser.LastName}"
+            );
+
+            var userResponse = new
+            {
+                token = new JwtSecurityTokenHandler().WriteToken(mytoken),
+                expired = mytoken.ValidTo,
+            };
+
+            return Ok(userResponse);
         }
+
 
         // Generating token based on user information
         private JwtSecurityToken GenerateAccessToken(string userId, string email, string fullName)
