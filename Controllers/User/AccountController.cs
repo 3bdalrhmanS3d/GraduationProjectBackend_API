@@ -6,11 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using System.Text;
-using MimeKit;
 using Microsoft.AspNetCore.Authorization;
-using MailKit.Net.Smtp;
-using MailKit.Security;
-using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
@@ -61,7 +57,8 @@ namespace GraduationProjectBackendAPI.Controllers.User
                         existingUserByEmail.AccountVerification.Date = DateTime.UtcNow;
                         await _context.SaveChangesAsync();
 
-                        _emailQueueService.QueueEmail(userInput.EmailAddress, newVerificationCode);
+                        _emailQueueService.QueueResendEmail(userInput.EmailAddress, newVerificationCode);
+
 
                     }
                     return CreateResponse("User already exists. Please verify your email.", "error");
@@ -98,7 +95,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             Response.Cookies.Append("EmailForVerification", userInput.EmailAddress, new CookieOptions
             {
                 HttpOnly = true,
-                Expires = DateTime.UtcNow.AddMinutes(30)
+                Expires = DateTime.UtcNow.AddMinutes(100)
             });
 
             
@@ -202,7 +199,8 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 existingUser.AccountVerification.Date = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
-                SendVerificationEmail(existingUser.EmailAddress, newVerificationCode);
+                _emailQueueService.QueueResendEmail(existingUser.EmailAddress, newVerificationCode);
+
                 return BadRequest("Your account is not verified. A new verification code has been sent to your email.");
             }
 
@@ -279,7 +277,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
                 var verificationCode = GenerateVerificationCode();
 
-                SendVerificationEmail(user.EmailAddress, verificationCode);
+                _emailQueueService.QueueEmail(user.EmailAddress, verificationCode);
                 return Ok("A verification code has been sent to your email address.");
             }
 
@@ -333,78 +331,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
                     message = "An error occurred during logout.",
                     status = "error"
                 });
-            }
-        }
-
-        [HttpPost("resend-verification-email")]
-        public async Task<IActionResult> ResendVerificationEmail()
-        {
-            if (!Request.Cookies.TryGetValue("EmailForVerification", out string emailAddressFromCookies))
-            {
-                return CreateResponse("Verification email not found. Please register again.", "error");
-            }
-
-            var user = await _context.UsersT.Include(u => u.AccountVerification)
-                                            .SingleOrDefaultAsync(u => u.EmailAddress == emailAddressFromCookies);
-
-            if (user == null || user.AccountVerification == null)
-            {
-                return CreateResponse("User not found or verification details missing.", "error");
-            }
-
-            if (user.AccountVerification.CheckedOK)
-            {
-                return CreateResponse("Account is already verified.", "error");
-            }
-
-            var newVerificationCode = GenerateVerificationCode();
-            user.AccountVerification.Code = newVerificationCode;
-            user.AccountVerification.Date = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            SendVerificationEmail(emailAddressFromCookies, newVerificationCode);
-
-            return CreateResponse("A new verification email has been sent.", "success");
-        }
-
-        private void SendVerificationEmail(string emailAddress, string verificationCode)
-        {
-            try
-            {
-                var smtpServer = _config["EmailSettings:SmtpServer"];
-                var port = int.Parse(_config["EmailSettings:Port"]);
-                var email = _config["EmailSettings:Email"];
-                var password = _config["EmailSettings:Password"];
-
-                var message = new MimeMessage();
-                message.From.Add(new MailboxAddress("Graduation Project", email));
-                message.To.Add(new MailboxAddress("User", emailAddress));
-                message.Subject = "Email Verification Code";
-
-                message.Body = new TextPart("plain")
-                {
-                    Text = $"Your verification code is: {verificationCode}"
-                };
-
-                using (var client = new SmtpClient())
-                {
-                    try
-                    {
-                        client.Connect(smtpServer, port, SecureSocketOptions.StartTls);
-                    }
-                    catch
-                    {
-                        client.Connect(smtpServer, 465, SecureSocketOptions.SslOnConnect);
-                    }
-
-                    client.Authenticate(email, password);
-                    client.Send(message);
-                    client.Disconnect(true);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Exception caught in SendVerificationEmail: {0}", ex.ToString());
             }
         }
 

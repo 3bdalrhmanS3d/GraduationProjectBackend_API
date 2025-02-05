@@ -8,7 +8,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 {
     public class EmailQueueService
     {
-        private readonly ConcurrentQueue<(string Email, string Code)> _emailQueue = new();
+        private readonly ConcurrentQueue<(string Email, string Code, bool IsResend)> _emailQueue = new();
         private readonly IConfiguration _config;
 
         public EmailQueueService(IConfiguration config)
@@ -16,20 +16,37 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _config = config;
         }
 
+        /// <summary>
+        /// Queue a new email for sending.
+        /// </summary>
         public void QueueEmail(string email, string code)
         {
-            _emailQueue.Enqueue((email, code));
+            _emailQueue.Enqueue((email, code, false)); // Normal email
         }
 
+        /// <summary>
+        /// Queue a resend email request.
+        /// </summary>
+        public void QueueResendEmail(string email, string code)
+        {
+            _emailQueue.Enqueue((email, code, true)); // Resend email
+        }
+
+        /// <summary>
+        /// Processes queued emails asynchronously.
+        /// </summary>
         public async Task ProcessQueueAsync()
         {
             while (_emailQueue.TryDequeue(out var item))
             {
-                await SendVerificationEmailAsync(item.Email, item.Code);
+                await SendVerificationEmailAsync(item.Email, item.Code, item.IsResend);
             }
         }
 
-        private async Task SendVerificationEmailAsync(string emailAddress, string verificationCode)
+        /// <summary>
+        /// Sends a verification email.
+        /// </summary>
+        private async Task SendVerificationEmailAsync(string emailAddress, string verificationCode, bool isResend)
         {
             try
             {
@@ -41,20 +58,27 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress("Graduation Project", email));
                 message.To.Add(new MailboxAddress("User", emailAddress));
-                message.Subject = "Email Verification Code";
-                message.Body = new TextPart("plain") { Text = $"Your verification code is: {verificationCode}" };
+
+                message.Subject = isResend ? "Resend: Email Verification Code" : "Email Verification Code";
+                message.Body = new TextPart("plain")
+                {
+                    Text = isResend
+                        ? $"You requested a new verification code. Your new verification code is: {verificationCode}"
+                        : $"Your verification code is: {verificationCode}"
+                };
 
                 using var client = new SmtpClient();
                 await client.ConnectAsync(smtpServer, port, SecureSocketOptions.StartTls);
                 await client.AuthenticateAsync(email, password);
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
+
+                Console.WriteLine($"Email sent successfully to {emailAddress}. Resend: {isResend}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error sending email: {ex.Message}");
+                Console.WriteLine($"Error sending email to {emailAddress}: {ex.Message}");
             }
-
         }
     }
 }
