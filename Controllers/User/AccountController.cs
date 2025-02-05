@@ -24,10 +24,13 @@ namespace GraduationProjectBackendAPI.Controllers.User
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
-        public AccountController(AppDbContext context, IConfiguration config)
+        private readonly EmailQueueService _emailQueueService;
+
+        public AccountController(AppDbContext context, IConfiguration config, EmailQueueService emailQueueService)
         {
             _context = context;
             _config = config;
+            _emailQueueService = emailQueueService;
         }
 
         [HttpPost("Signup")]
@@ -39,7 +42,10 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return CreateResponse("Validation failed", "error", errors);
             }
 
-            var existingUserByEmail = await _context.UsersT.SingleOrDefaultAsync(x => x.EmailAddress == userInput.EmailAddress);
+            var existingUserByEmail = await _context.UsersT
+                .AsNoTracking()
+                .SingleOrDefaultAsync(x => x.EmailAddress == userInput.EmailAddress);
+
             if (existingUserByEmail != null)
             {
                 if (existingUserByEmail.AccountVerification != null && existingUserByEmail.AccountVerification.CheckedOK)
@@ -55,7 +61,8 @@ namespace GraduationProjectBackendAPI.Controllers.User
                         existingUserByEmail.AccountVerification.Date = DateTime.UtcNow;
                         await _context.SaveChangesAsync();
 
-                        SendVerificationEmail(existingUserByEmail.EmailAddress, newVerificationCode);
+                        _emailQueueService.QueueEmail(userInput.EmailAddress, newVerificationCode);
+
                     }
                     return CreateResponse("User already exists. Please verify your email.", "error");
                 }
@@ -85,13 +92,16 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _context.AccountVerificationT.Add(accountVerification);
             await _context.SaveChangesAsync();
 
-            SendVerificationEmail(userInput.EmailAddress, verificationCode);
+            _emailQueueService.QueueEmail(userInput.EmailAddress, verificationCode);
+
 
             Response.Cookies.Append("EmailForVerification", userInput.EmailAddress, new CookieOptions
             {
                 HttpOnly = true,
                 Expires = DateTime.UtcNow.AddMinutes(30)
             });
+
+            
 
             return CreateResponse("Registration successful. Please check your email for the verification code.", "success");
         }
@@ -248,7 +258,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 issuer: _config["JWT:ValidIss"],
                 audience: _config["JWT:ValidAud"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(6), 
+                expires: DateTime.UtcNow.AddHours(1), // 1 hour expiration 
                 signingCredentials: signingCredentials
             );
 
@@ -398,9 +408,19 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
         }
 
-        private bool VerifyPassword(string password, string hashedPassword)
+        // Verify a password against the stored hash
+        private bool VerifyPassword(string password, string storedHash)
         {
-            return BCrypt.Net.BCrypt.Verify(password, hashedPassword);
+            var parts = storedHash.Split(':');
+            if (parts.Length != 2) return false;
+
+            byte[] salt = Convert.FromBase64String(parts[0]);
+            byte[] storedHashBytes = Convert.FromBase64String(parts[1]);
+
+            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256);
+            byte[] hash = pbkdf2.GetBytes(32);
+
+            return hash.SequenceEqual(storedHashBytes);
         }
 
         private string GenerateVerificationCode()
@@ -418,10 +438,19 @@ namespace GraduationProjectBackendAPI.Controllers.User
             });
         }
 
+        // Generate a secure salted hash for passwords
         private string HashPassword(string password)
         {
-            return BCrypt.Net.BCrypt.HashPassword(password);
+            using var rng = new RNGCryptoServiceProvider();
+            byte[] salt = new byte[16];
+            rng.GetBytes(salt);
+
+            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256);
+            byte[] hash = pbkdf2.GetBytes(32);
+
+            return Convert.ToBase64String(salt) + ":" + Convert.ToBase64String(hash);
         }
+
 
     }
 

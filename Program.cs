@@ -1,4 +1,5 @@
-﻿using GraduationProjectBackendAPI.Models.AppDBContext;
+﻿using GraduationProjectBackendAPI.Controllers.User;
+using GraduationProjectBackendAPI.Models.AppDBContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -86,6 +87,8 @@ namespace GraduationProjectBackendAPI
                     }
                 });
             });
+            builder.Services.AddSingleton<EmailQueueService>();
+            builder.Services.AddHostedService<EmailQueueBackgroundService>();
 
             builder.Services.AddEndpointsApiExplorer();
 
