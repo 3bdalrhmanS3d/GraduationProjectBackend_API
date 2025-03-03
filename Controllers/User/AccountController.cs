@@ -14,7 +14,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace GraduationProjectBackendAPI.Controllers.User
 {
 
-    [Route("api/[controller]")]
+    [Route("api/Account")]
     [ApiController]
     public class AccountController : ControllerBase
     {
@@ -67,11 +67,11 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             Users newUser = new Users
             {
-                FirstName = userInput.FirstName,
-                LastName = userInput.LastName,
+                FullName = $"{userInput.FirstName} {userInput.LastName}",
                 EmailAddress = userInput.EmailAddress,
                 PasswordHash = HashPassword(userInput.PasswordHash),
                 CreatedAt = DateTime.UtcNow,
+                Role = UserRole.RegularUser
             };
 
             _context.UsersT.Add(newUser);
@@ -225,13 +225,15 @@ namespace GraduationProjectBackendAPI.Controllers.User
             JwtSecurityToken mytoken = GenerateAccessToken(
                 existingUser.UserId.ToString(),
                 existingUser.EmailAddress,
-                $"{existingUser.FirstName} {existingUser.LastName}"
+                existingUser.FullName,
+                existingUser.Role
             );
 
             var userResponse = new
             {
                 token = new JwtSecurityTokenHandler().WriteToken(mytoken),
                 expired = mytoken.ValidTo,
+                role = existingUser.Role.ToString() // User role
             };
 
             return Ok(userResponse);
@@ -239,14 +241,15 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
 
         // Generating token based on user information
-        private JwtSecurityToken GenerateAccessToken(string userId, string email, string fullName)
+        private JwtSecurityToken GenerateAccessToken(string userId, string email, string fullName, UserRole role )
         {
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, userId),
                 new Claim(ClaimTypes.Email, email),
                 new Claim(ClaimTypes.Name, fullName),
-                
+                new Claim(ClaimTypes.Role, role.ToString() )
+
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:SecretKey"]));

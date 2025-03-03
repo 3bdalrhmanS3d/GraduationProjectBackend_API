@@ -34,6 +34,8 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<UserLog> UserLogs { get; set; }
         public DbSet<AIChat> AIChatT { get; set; }
 
+        public DbSet<AdminActionLog> adminActionLogs { get; set; }
+
         public DbSet<Notification> NotificationT { get; set; }
         // Courses Platform Tables
         public DbSet<Courses.Courses> Courses { get; set; }

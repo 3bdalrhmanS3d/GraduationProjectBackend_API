@@ -4,6 +4,7 @@ using GraduationProjectBackendAPI.Models.AppDBContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GraduationProjectBackendAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250302225043_ChangeToFullName")]
+    partial class ChangeToFullName
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -624,40 +626,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.ToTable("UserTasks");
                 });
 
-            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.AdminActionLog", b =>
-                {
-                    b.Property<int>("LogId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LogId"), 1L, 1);
-
-                    b.Property<DateTime>("ActionDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ActionDetails")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ActionType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("AdminId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("TargetUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("LogId");
-
-                    b.HasIndex("AdminId");
-
-                    b.HasIndex("TargetUserId");
-
-                    b.ToTable("adminActionLogs");
-                });
-
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.AIChat", b =>
                 {
                     b.Property<int>("ChatId")
@@ -1152,25 +1120,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Navigation("TaskT");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.AdminActionLog", b =>
-                {
-                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "Admin")
-                        .WithMany()
-                        .HasForeignKey("AdminId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "TargetUser")
-                        .WithMany()
-                        .HasForeignKey("TargetUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Admin");
-
-                    b.Navigation("TargetUser");
                 });
 
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.AIChat", b =>

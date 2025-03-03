@@ -65,11 +65,11 @@ namespace GraduationProjectBackendAPI
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     In = ParameterLocation.Header,
-                    Description = "Please insert JWT token into field",
                     Name = "Authorization",
                     Type = SecuritySchemeType.ApiKey,
                     BearerFormat = "JWT",
-                    Scheme = "Bearer"
+                    Scheme = "Bearer",
+                    Description = "Enter 'Bearer {token}' in the field below."
                 });
 
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement

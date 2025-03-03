@@ -5,6 +5,16 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GraduationProjectBackendAPI.Models.User
 {
+    public enum UserRole
+    {
+        [Description("RegularUser")]
+        RegularUser,
+        [Description("Instructor")]
+        Instructor,
+        [Description("Admin")]
+        Admin
+    }
+
     public class Users
     {
         [Key]
@@ -12,12 +22,8 @@ namespace GraduationProjectBackendAPI.Models.User
         public int UserId { get; set; }
 
         [Required]
-        [StringLength(50)]
-        public string FirstName { get; set; }
-
-        [Required]
-        [StringLength(50)]
-        public string LastName { get; set; }
+        [StringLength(100)]
+        public string FullName { get; set; }
 
         [Required]
         [EmailAddress]
@@ -30,6 +36,11 @@ namespace GraduationProjectBackendAPI.Models.User
 
         // Timestamp indicating when the user account was created.
         public DateTime CreatedAt { get; set; }
+
+        [Required]
+        [DefaultValue(UserRole.RegularUser)]
+
+        public UserRole Role { get; set; } = UserRole.RegularUser;
 
         public UserDetails UserDetails { get; set; }
         public ICollection<UserVisitHistory>? UserVisitHistories { get; set; }
