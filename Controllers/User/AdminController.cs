@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System;
+using Microsoft.EntityFrameworkCore;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
@@ -26,27 +27,24 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return Ok(new { message = "Welcome to Admin Dashboard!" });
         }
 
+        // GET /api/admin/all-users?role=RegularUser
+        // GET /api/admin/all-users?role=Instructor
+        // GET /api/admin/all-users?role=Admin
+        // GET /api/admin/all-users
+
         [HttpGet("all-users")]
-        public IActionResult GetAllUsers()
+        public async Task<IActionResult> GetAllUsers([FromQuery] UserRole? role = null)
         {
-            var allUsers = _context.UsersT.Where(u => u.Role == UserRole.RegularUser).ToList();
-            return Ok(new {  allUsers } );
+            IQueryable<Users> query = _context.UsersT;
+
+            if (role.HasValue)
+                query = query.Where(u => u.Role == role.Value);
+
+            var allUsers = await query.ToListAsync();
+
+            return Ok(new { count = allUsers.Count, allUsers });
         }
 
-        [HttpGet("all-instructors")]
-        public IActionResult GetAllInstructors()
-        {
-            var allInstructors = _context.UsersT.Where(u => u.Role == UserRole.Instructor).ToList();
-
-            return Ok(new { allInstructors });
-        }
-
-        [HttpGet("all-admins")]
-        public IActionResult GetAllAdmins()
-        {
-            var allAdmins = _context.UsersT.Where(u => u.Role == UserRole.Admin).ToList();
-            return Ok(new { allAdmins });
-        }
 
         [HttpPost("make-instructor/{userId}")]
         public async Task <IActionResult> MakeInstructor(int userId)
@@ -106,13 +104,13 @@ namespace GraduationProjectBackendAPI.Controllers.User
         }
 
         [HttpGet("search-user")]
-        public IActionResult SearchUserByEmail([FromQuery] string email)
+        public async Task<IActionResult> SearchUserByEmail([FromQuery] string email)
         {
             if (string.IsNullOrWhiteSpace(email))
                 return BadRequest(new { message = "Email is required for search!" });
 
-            var user = _context.UsersT
-                        .FirstOrDefault(u => u.EmailAddress.ToLower() == email.ToLower());
+            var user = await _context.UsersT
+                        .FirstOrDefaultAsync(u => string.Equals(u.EmailAddress, email, StringComparison.OrdinalIgnoreCase));
 
             if (user == null)
                 return NotFound(new { message = "User not found." });
@@ -120,9 +118,25 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return Ok(new { user });
         }
 
+
         private async Task<Users> FindUserById(int userId)
         {
             return await _context.UsersT.FindAsync(userId);
+        }
+
+        [HttpGet("all-admin-actions")]
+        public async Task<IActionResult> GetAllAdminActions()
+        {
+            var adminId = GetUserIdFromToken();
+            if (adminId == null)
+                return Unauthorized(new { message = "Invalid or missing token." });
+
+            var allActions = await _context.adminActionLogs
+                .Include(a => a.Admin)
+                .Include(a => a.TargetUser)
+                .ToListAsync();
+
+            return Ok(new { allActions });
         }
 
         private void LogAdminAction(int adminId, int targetUserId, string actionType, string details)
