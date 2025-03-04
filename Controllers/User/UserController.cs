@@ -262,7 +262,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
         [StringLength(100)]
         public string National { get; set; }
     }
-
     public class PaymentRequestModel
     {
         [Required]

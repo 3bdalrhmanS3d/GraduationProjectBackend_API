@@ -29,6 +29,50 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _emailQueueService = emailQueueService;
         }
 
+        #region
+        /* 
+        ==========================================
+        Signup Endpoint - User Registration
+        ==========================================
+
+        🔹 This endpoint is responsible for user registration.
+        🔹 It checks if the user already exists and handles email verification.
+        🔹 If the user is new, they receive an email with a verification code.
+        🔹 If the user has an unverified account, they must verify their email first.
+
+        Key Features & Improvements:
+        ------------------------------------------------
+        ✔ Prevents spamming by limiting email verification code resends to once every 30 minutes.
+        ✔ Optimized database queries by fetching only necessary user data.
+        ✔ Ensures email uniqueness before allowing a new user to register.
+        ✔ Uses secure cookies for verification tracking.
+        ✔ Reduces database operations with a single `SaveChangesAsync()` call when possible.
+        ✔ Provides meaningful error messages to improve user experience.
+
+        Important Notes for Future Updates:
+        ------------------------------------------------
+        🔸 If the verification process needs changes, ensure `AccountVerificationT` logic is updated accordingly.
+        🔸 If adding new authentication mechanisms (OAuth, SSO), update this flow to handle different account states.
+        🔸 If password complexity rules change, ensure `HashPassword()` remains synchronized.
+
+        Developer Notes:
+        ------------------------------------------------
+        - When modifying this logic, ensure that email throttling and security mechanisms are intact.
+        - Avoid exposing detailed error messages in production for security reasons.
+        - Consider logging unsuccessful registration attempts for security analysis.
+
+        Related Components:
+        - `VerifyAccount()` (Handles email verification)
+        - `Signin()` (Handles login and failed attempts tracking)
+        - `EmailQueueService` (Handles queued email sending)
+
+        ==========================================
+        Developed & Maintained by: [abdo]
+        Last Updated: [4 march 25]
+        ==========================================
+        */
+        #endregion
+
         [HttpPost("Signup")]
         public async Task<IActionResult> Signup([FromBody] UserInput userInput)
         {
@@ -40,6 +84,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             var existingUserByEmail = await _context.UsersT
                 .AsNoTracking()
+                .Include(u=> u.AccountVerification)
                 .SingleOrDefaultAsync(x => x.EmailAddress == userInput.EmailAddress);
 
             if (existingUserByEmail != null)
@@ -48,21 +93,40 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 {
                     return CreateResponse("User already exists and is verified.", "error");
                 }
+
+                if (existingUserByEmail.AccountVerification != null)
+                {
+                    var lastSentTime = existingUserByEmail.AccountVerification.Date;
+                    var timeSinceLastSent = DateTime.UtcNow - lastSentTime;
+
+                    if (timeSinceLastSent.TotalMinutes < 30)
+                    {
+                        return CreateResponse(
+                            $"A verification code was already sent. Please wait {30 - (int)timeSinceLastSent.TotalMinutes} minutes before requesting a new one.",
+                            "error"
+                        );
+                    }
+
+                    // Update the verification code after 30 minutes
+                    var newVerificationCode = GenerateVerificationCode();
+                    existingUserByEmail.AccountVerification.Code = newVerificationCode;
+                    existingUserByEmail.AccountVerification.Date = DateTime.UtcNow;
+                }
                 else
                 {
-                    if (existingUserByEmail.AccountVerification.Date.AddMinutes(30) < DateTime.UtcNow)
+                    // Create a verification code if it does not exist
+                    existingUserByEmail.AccountVerification = new AccountVerification
                     {
-                        var newVerificationCode = GenerateVerificationCode();
-                        existingUserByEmail.AccountVerification.Code = newVerificationCode;
-                        existingUserByEmail.AccountVerification.Date = DateTime.UtcNow;
-                        await _context.SaveChangesAsync();
-
-                        _emailQueueService.QueueResendEmail(userInput.EmailAddress, existingUserByEmail.FullName, newVerificationCode);
-
-
-                    }
-                    return CreateResponse("User already exists. Please verify your email.", "error");
+                        UserId = existingUserByEmail.UserId,
+                        Code = GenerateVerificationCode(),
+                        CheckedOK = false,
+                        Date = DateTime.UtcNow
+                    };
                 }
+
+                await _context.SaveChangesAsync();
+                _emailQueueService.QueueResendEmail(userInput.EmailAddress, existingUserByEmail.FullName, existingUserByEmail.AccountVerification.Code);
+                return CreateResponse("User already exists. Please verify your email.", "error");
             }
 
             Users newUser = new Users
@@ -78,7 +142,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
             await _context.SaveChangesAsync();
 
             var verificationCode = GenerateVerificationCode();
-
             AccountVerification accountVerification = new AccountVerification
             {
                 UserId = newUser.UserId,
@@ -95,10 +158,10 @@ namespace GraduationProjectBackendAPI.Controllers.User
             Response.Cookies.Append("EmailForVerification", userInput.EmailAddress, new CookieOptions
             {
                 HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
                 Expires = DateTime.UtcNow.AddMinutes(100)
             });
-
-            
 
             return CreateResponse("Registration successful. Please check your email for the verification code.", "success");
         }
@@ -143,9 +206,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
             public string VerificationCode { get; set; }
         }
 
-        // Signin endpoint
-        private static Dictionary<string, (int Attempts, DateTime LockoutEnd)> _failedLoginAttempts = new();
-
         [HttpPost("Signin")]
         public async Task<IActionResult> Signin([FromBody] UserSignInInput userSignInInput)
         {
@@ -170,14 +230,12 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (existingUser == null || !VerifyPassword(userSignInInput.Password, existingUser.PasswordHash))
             {
                 //Record attempt failure
-                if (!_failedLoginAttempts.ContainsKey(email))
+                if (!_failedLoginAttempts.TryGetValue(email, out var attemptData))
                 {
-                    _failedLoginAttempts[email] = (1, DateTime.UtcNow);
+                    attemptData = (0, DateTime.UtcNow);
                 }
-                else
-                {
-                    _failedLoginAttempts[email] = (_failedLoginAttempts[email].Attempts + 1, DateTime.UtcNow);
-                }
+
+                _failedLoginAttempts[email] = (attemptData.Attempts + 1, DateTime.UtcNow);
 
                 //If failed attempts exceed 5, the user is blocked for 15 minutes
                 if (_failedLoginAttempts[email].Attempts >= 5)
@@ -239,33 +297,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return Ok(userResponse);
         }
 
-
-        // Generating token based on user information
-        private JwtSecurityToken GenerateAccessToken(string userId, string email, string fullName, UserRole role )
-        {
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, userId),
-                new Claim(ClaimTypes.Email, email),
-                new Claim(ClaimTypes.Name, fullName),
-                new Claim(ClaimTypes.Role, role.ToString() )
-
-            };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:SecretKey"]));
-            var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _config["JWT:ValidIss"],
-                audience: _config["JWT:ValidAud"],
-                claims: claims,
-                expires: DateTime.UtcNow.AddHours(1), // 1 hour expiration 
-                signingCredentials: signingCredentials
-            );
-
-            return token;
-        }
-
         // Forget Password endpoint
         [HttpPost("forget-password")]
         public async Task<IActionResult> ForgetPassword([FromBody] UserForgetPassInput userFPInput)
@@ -300,7 +331,13 @@ namespace GraduationProjectBackendAPI.Controllers.User
                     Response.Cookies.Delete(cookie);
                 }
 
-                var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+                var tokenHeader = Request.Headers["Authorization"].ToString();
+                if (string.IsNullOrWhiteSpace(tokenHeader) || !tokenHeader.StartsWith("Bearer "))
+                {
+                    return BadRequest(new { message = "Invalid token format." });
+                }
+
+                var token = tokenHeader.Replace("Bearer ", "").Trim();
 
                 if (!string.IsNullOrEmpty(token))
                 {
@@ -337,24 +374,64 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
         }
 
+        // Generating token based on user information
+        private JwtSecurityToken GenerateAccessToken(string userId, string email, string fullName, UserRole role)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId),
+                new Claim(ClaimTypes.Email, email),
+                new Claim(ClaimTypes.Name, fullName),
+                new Claim(ClaimTypes.Role, role.ToString() )
+
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JWT:SecretKey"]));
+            var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _config["JWT:ValidIss"],
+                audience: _config["JWT:ValidAud"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(1), // 1 hour expiration 
+                signingCredentials: signingCredentials
+            );
+
+            return token;
+        }
+
+        // Signin endpoint
+        private static Dictionary<string, (int Attempts, DateTime LockoutEnd)> _failedLoginAttempts = new();
+
         // Verify a password against the stored hash
         private bool VerifyPassword(string password, string storedHash)
         {
+            if (string.IsNullOrWhiteSpace(storedHash) || !storedHash.Contains(":"))
+                return false;
+
             var parts = storedHash.Split(':');
             if (parts.Length != 2) return false;
+
+            if (!Convert.TryFromBase64String(parts[0], new byte[16], out _))
+                return false; // Checking that 'Salt' is true
+
+            if (!Convert.TryFromBase64String(parts[1], new byte[32], out _))
+                return false; // Checking that 'Hash' is true
 
             byte[] salt = Convert.FromBase64String(parts[0]);
             byte[] storedHashBytes = Convert.FromBase64String(parts[1]);
 
             using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256);
-            byte[] hash = pbkdf2.GetBytes(32);
+            byte[] hash = pbkdf2.GetBytes(storedHashBytes.Length);
 
-            return hash.SequenceEqual(storedHashBytes);
+            return CryptographicOperations.FixedTimeEquals(hash, storedHashBytes);
         }
-
         private string GenerateVerificationCode()
         {
-            return new Random().Next(100000, 999999).ToString();
+            byte[] bytes = new byte[4];
+            RandomNumberGenerator.Fill(bytes);
+            int code = BitConverter.ToInt32(bytes, 0) % 900000 + 100000; 
+            return Math.Abs(code).ToString();
         }
 
         private IActionResult CreateResponse(string message, string status, object data = null)
@@ -370,16 +447,15 @@ namespace GraduationProjectBackendAPI.Controllers.User
         // Generate a secure salted hash for passwords
         private string HashPassword(string password)
         {
-            using var rng = new RNGCryptoServiceProvider();
             byte[] salt = new byte[16];
-            rng.GetBytes(salt);
+
+            RandomNumberGenerator.Fill(salt);
 
             using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256);
             byte[] hash = pbkdf2.GetBytes(32);
 
             return Convert.ToBase64String(salt) + ":" + Convert.ToBase64String(hash);
         }
-
 
     }
 
