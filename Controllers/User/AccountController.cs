@@ -57,7 +57,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                         existingUserByEmail.AccountVerification.Date = DateTime.UtcNow;
                         await _context.SaveChangesAsync();
 
-                        _emailQueueService.QueueResendEmail(userInput.EmailAddress, newVerificationCode);
+                        _emailQueueService.QueueResendEmail(userInput.EmailAddress, existingUserByEmail.FullName, newVerificationCode);
 
 
                     }
@@ -89,7 +89,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _context.AccountVerificationT.Add(accountVerification);
             await _context.SaveChangesAsync();
 
-            _emailQueueService.QueueEmail(userInput.EmailAddress, verificationCode);
+            _emailQueueService.QueueEmail(userInput.EmailAddress, newUser.FullName, verificationCode);
 
 
             Response.Cookies.Append("EmailForVerification", userInput.EmailAddress, new CookieOptions
@@ -199,7 +199,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 existingUser.AccountVerification.Date = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
-                _emailQueueService.QueueResendEmail(existingUser.EmailAddress, newVerificationCode);
+                _emailQueueService.QueueResendEmail(existingUser.EmailAddress, existingUser.FullName , newVerificationCode);
 
                 return BadRequest("Your account is not verified. A new verification code has been sent to your email.");
             }
@@ -280,7 +280,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
                 var verificationCode = GenerateVerificationCode();
 
-                _emailQueueService.QueueEmail(user.EmailAddress, verificationCode);
+                _emailQueueService.QueueEmail(user.EmailAddress, user.FullName, verificationCode);
                 return Ok("A verification code has been sent to your email address.");
             }
 
