@@ -40,6 +40,7 @@ namespace GraduationProjectBackendAPI.Models.User
         [Required]
         [DefaultValue(UserRole.RegularUser)]
 
+        public string? ProfilePhoto { get; set; }
         public UserRole Role { get; set; } = UserRole.RegularUser;
 
         public UserDetails UserDetails { get; set; }

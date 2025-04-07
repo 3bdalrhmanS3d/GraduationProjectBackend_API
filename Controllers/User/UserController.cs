@@ -104,6 +104,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 user.FullName,
                 user.EmailAddress,
                 user.Role,
+                user.ProfilePhoto,
                 user.CreatedAt,
                 user.UserDetails?.BirthDate,
                 user.UserDetails?.Edu,
@@ -237,6 +238,76 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             return Ok(new { count = courses.Count(), courses });
 
+        }
+
+        [HttpPost("upload-profile-photo")]
+        public async Task<IActionResult> UploadProfilePhoto( IFormFile file)
+        {
+            var userId = GetUserIdFromToken();
+            if( userId == null)
+                return Unauthorized(new { message = "Invalid or missing token." });
+
+            var user = await _context.UsersT.FindAsync(userId);
+            if (user == null)
+                return NotFound(new { message = "User not found." });
+
+            if(file == null || file.Length == 0)
+                return BadRequest(new { message = "No file uploaded." });
+
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads/profile-pictures");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+            
+            // Generate Unique File Name
+            var fileExtension = Path.GetExtension(file.FileName);
+            var fileName = $"user_{userId}{fileExtension}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            // Save File to Server
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // Update User's Profile Photo in Database
+            user.ProfilePhoto = $"/uploads/profile-pictures/{fileName}";
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Profile photo uploaded successfully.", profilePhotoUrl = user.ProfilePhoto });
+        }
+
+        [HttpDelete("delete-profile-photo")]
+        public async Task<IActionResult> DeleteProfilePhoto()
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null)
+                return Unauthorized(new { message = "Invalid or missing token." });
+
+            var user = await _context.UsersT.FindAsync(userId);
+            if (user == null)
+                return NotFound(new { message = "User not found." });
+
+            // Check if the user has a custom profile photo
+            if (string.IsNullOrEmpty(user.ProfilePhoto) || user.ProfilePhoto == "/uploads/profile-pictures/default.png")
+            {
+                return BadRequest(new { message = "No custom profile photo to delete." });
+            }
+
+            // Define the file path
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var filePath = Path.Combine(uploadsFolder, user.ProfilePhoto.TrimStart('/')); // Convert URL path to server path
+
+            // Delete the file from the server if it exists
+            if (System.IO.File.Exists(filePath))
+            {
+                System.IO.File.Delete(filePath);
+            }
+
+            // Reset the profile photo to the default image
+            user.ProfilePhoto = "/uploads/profile-pictures/default.png";
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Profile photo deleted successfully. Default photo restored.", profilePhotoUrl = user.ProfilePhoto });
         }
 
         private int? GetUserIdFromToken()

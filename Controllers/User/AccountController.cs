@@ -135,7 +135,8 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 EmailAddress = userInput.EmailAddress,
                 PasswordHash = HashPassword(userInput.PasswordHash),
                 CreatedAt = DateTime.UtcNow,
-                Role = UserRole.RegularUser
+                Role = UserRole.RegularUser, 
+                ProfilePhoto = "/uploads/profile-pictures/default.png"
             };
 
             _context.UsersT.Add(newUser);
