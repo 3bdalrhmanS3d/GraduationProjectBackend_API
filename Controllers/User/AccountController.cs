@@ -312,12 +312,60 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
                 var verificationCode = GenerateVerificationCode();
 
-                _emailQueueService.QueueEmail(user.EmailAddress, user.FullName, verificationCode);
+                var resetLink = $"https://yourfrontend.com/reset-password?email={user.EmailAddress}&code={verificationCode}";
+
+                _emailQueueService.QueueEmail(user.EmailAddress, user.FullName, verificationCode, resetLink);
+
                 return Ok("A verification code has been sent to your email address.");
             }
 
             return BadRequest(ModelState);
         }
+
+        // Reset Password endpoint
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordInput input)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var user = await _context.UsersT
+                .Include(u => u.AccountVerification)
+                .FirstOrDefaultAsync(u => u.EmailAddress == input.Email);
+
+            if (user == null || user.AccountVerification == null)
+                return NotFound(new { message = "Invalid email or verification code." });
+
+            if (user.AccountVerification.Code != input.Code ||
+                user.AccountVerification.Date.AddMinutes(30) < DateTime.UtcNow)
+            {
+                return BadRequest(new { message = "Invalid or expired verification code." });
+            }
+
+            user.PasswordHash = HashPassword(input.NewPassword);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password reset successful. You can now log in." });
+        }
+
+        public class ResetPasswordInput
+        {
+            [Required]
+            [EmailAddress]
+            public string Email { get; set; }
+
+            [Required]
+            public string Code { get; set; }
+
+            [Required]
+            [MinLength(6)]
+            public string NewPassword { get; set; }
+
+            [Required]
+            [Compare("NewPassword", ErrorMessage = "Passwords do not match.")]
+            public string ConfirmPassword { get; set; }
+        }
+
 
         [HttpPost("logout")]
         [Authorize]
