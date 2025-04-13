@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace GraduationProjectBackendAPI.Controllers.User
+namespace GraduationProjectBackendAPI.Controllers.DOT
 {
     public class UserSignInInput
     {
@@ -10,5 +10,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
         [Required(ErrorMessage = "Password is required.")]
         public string Password { get; set; }
+
+        public bool RememberMe { get; set; }
     }
 }

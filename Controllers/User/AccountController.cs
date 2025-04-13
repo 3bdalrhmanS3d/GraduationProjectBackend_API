@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
+using GraduationProjectBackendAPI.Controllers.DOT;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
@@ -201,11 +202,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             return CreateResponse("Account verification successful. You can now sign in.", "success");
         }
-        public class VerifyAccountInput
-        {
-            [Required]
-            public string VerificationCode { get; set; }
-        }
+        
 
         [HttpPost("Signin")]
         public async Task<IActionResult> Signin([FromBody] UserSignInInput userSignInInput)
@@ -215,6 +212,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return Unauthorized(new { message = "Invalid login credentials." });
             }
 
+            // 1️⃣ Check if the user is already logged in
             string email = userSignInInput.Email;
 
             // Lock verification 1️⃣ due to repeated failure attempts
@@ -281,11 +279,14 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             // 6️ JWT token generation and sending to user
 
+            var tokenDuration = userSignInInput.RememberMe ? TimeSpan.FromDays(30) : TimeSpan.FromHours(3);
+
             JwtSecurityToken mytoken = GenerateAccessToken(
                 existingUser.UserId.ToString(),
                 existingUser.EmailAddress,
                 existingUser.FullName,
-                existingUser.Role
+                existingUser.Role,
+                tokenDuration
             );
 
             var userResponse = new
@@ -295,7 +296,64 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 role = existingUser.Role.ToString() // User role
             };
 
+            // remmeber me 
+            if (userSignInInput.RememberMe)
+            {
+                var cookieOptions = new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = DateTime.UtcNow.AddDays(30) // Set the expiration to 30 days
+                };
+                Response.Cookies.Append("UserEmail", existingUser.EmailAddress, cookieOptions);
+                
+                Response.Cookies.Append("UserPassword", userSignInInput.Password, cookieOptions);
+            }
+
             return Ok(userResponse);
+        }
+
+        [HttpGet("auto-login")]
+        public async Task<IActionResult> AutoLoginFromCookies()
+        {
+            var email = Request.Cookies["UserEmail"];
+            var password = Request.Cookies["UserPassword"];
+
+            if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
+            {
+                return Unauthorized(new { message = "Auto-login failed: missing cookies." });
+            }
+
+            var existingUser = await _context.UsersT
+                .Include(u => u.AccountVerification)
+                .SingleOrDefaultAsync(x => x.EmailAddress == email);
+
+            if (existingUser == null || !VerifyPassword(password, existingUser.PasswordHash))
+            {
+                return Unauthorized(new { message = "Invalid credentials." });
+            }
+
+            // Check if the account is verified
+            if (existingUser.AccountVerification != null && !existingUser.AccountVerification.CheckedOK)
+            {
+                return BadRequest("Your account is not verified. Please check your email for the verification code.");
+            }
+
+            JwtSecurityToken mytoken = GenerateAccessToken(
+                existingUser.UserId.ToString(),
+                existingUser.EmailAddress,
+                existingUser.FullName,
+                existingUser.Role
+            );
+
+            return Ok(new
+            {
+                token = new JwtSecurityTokenHandler().WriteToken(mytoken),
+                expired = mytoken.ValidTo,
+                role = existingUser.Role.ToString()
+            });
+
         }
 
         // Forget Password endpoint
@@ -346,24 +404,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Password reset successful. You can now log in." });
-        }
-
-        public class ResetPasswordInput
-        {
-            [Required]
-            [EmailAddress]
-            public string Email { get; set; }
-
-            [Required]
-            public string Code { get; set; }
-
-            [Required]
-            [MinLength(6)]
-            public string NewPassword { get; set; }
-
-            [Required]
-            [Compare("NewPassword", ErrorMessage = "Passwords do not match.")]
-            public string ConfirmPassword { get; set; }
         }
 
 
@@ -424,7 +464,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
         }
 
         // Generating token based on user information
-        private JwtSecurityToken GenerateAccessToken(string userId, string email, string fullName, UserRole role)
+        private JwtSecurityToken GenerateAccessToken(string userId, string email, string fullName, UserRole role, TimeSpan? customExpiry = null)
         {
             var claims = new List<Claim>
             {
@@ -442,7 +482,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 issuer: _config["JWT:ValidIss"],
                 audience: _config["JWT:ValidAud"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(1), // 1 hour expiration 
+                expires: DateTime.UtcNow.Add(customExpiry ?? TimeSpan.FromHours(1)),
                 signingCredentials: signingCredentials
             );
 
