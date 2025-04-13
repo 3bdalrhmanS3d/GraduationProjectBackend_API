@@ -172,7 +172,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
         [HttpPost("Verify-account")]
         public async Task<IActionResult> VerifyAccount([FromBody] VerifyAccountInput input)
         {
-            if (!Request.Cookies.TryGetValue("EmailForVerification", out string emailAddressFromCookies))
+            if (!Request.Cookies.TryGetValue("EmailForVerification", out var emailAddressFromCookies))
             {
                 return CreateResponse("Verification email not found. Please register again.", "error");
             }
@@ -202,7 +202,40 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             return CreateResponse("Account verification successful. You can now sign in.", "success");
         }
-        
+
+        // Resend Verification Code endpoint
+        [HttpPost("Resend-verification-code")]
+        public async Task<IActionResult> ResendVerificationCode()
+        {
+
+            if (!Request.Cookies.TryGetValue("EmailForVerification", out string emailAddressFromCookies))
+            {
+                return BadRequest("Verification email not found.");
+            }
+
+
+            var user = await _context.UsersT.Include(u => u.AccountVerification)
+                                    .SingleOrDefaultAsync(u => u.EmailAddress == emailAddressFromCookies);
+
+            if (user == null || user.AccountVerification == null)
+                return NotFound("User not found.");
+
+            var timeSinceLast = DateTime.UtcNow - user.AccountVerification.Date;
+            if (timeSinceLast.TotalMinutes < 2)
+            {
+                return BadRequest("Please wait at least 2 minutes before resending the code.");
+            }
+
+
+            var newCode = GenerateVerificationCode();
+            user.AccountVerification.Code = newCode;
+            user.AccountVerification.Date = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            _emailQueueService.QueueResendEmail(user.EmailAddress, user.FullName, newCode);
+
+            return Ok("Verification code resent successfully.");
+        }
 
         [HttpPost("Signin")]
         public async Task<IActionResult> Signin([FromBody] UserSignInInput userSignInInput)

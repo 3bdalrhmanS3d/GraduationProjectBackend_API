@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using GraduationProjectBackendAPI.Controllers.DOT;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
@@ -320,30 +321,5 @@ namespace GraduationProjectBackendAPI.Controllers.User
         }
         
     }
-    public class UserProfileUpdateModel
-    {
-        [Required]
-        public DateTime BirthDate { get; set; }
-
-        [Required]
-        [StringLength(50)]
-        public string Edu { get; set; } // 'Primary', 'Middle', 'High School', 'University'
-
-        [Required]
-        [StringLength(100)]
-        public string National { get; set; }
-    }
-    public class PaymentRequestModel
-    {
-        [Required]
-        public int CourseId { get; set; }
-
-        [Required]
-        [Range(1, double.MaxValue, ErrorMessage = "Amount must be greater than 0")]
-        public decimal Amount { get; set; }
-
-        [Required]
-        public string TransactionId { get; set; }
-    }
-
+    
 }
