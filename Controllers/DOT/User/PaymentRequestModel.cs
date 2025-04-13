@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Xunit.Sdk;
 
-namespace GraduationProjectBackendAPI.Controllers.DOT
+namespace GraduationProjectBackendAPI.Controllers.DOT.User
 {
     public class PaymentRequestModel
     {

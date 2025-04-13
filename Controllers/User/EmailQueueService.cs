@@ -51,7 +51,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             try
             {
                 var smtpServer = _config["EmailSettings:SmtpServer"];
-                var port = int.Parse(_config["EmailSettings:Port"]);
+                var port = Convert.ToInt32(_config["EmailSettings:Port"]);
                 var email = _config["EmailSettings:Email"];
                 var password = _config["EmailSettings:Password"];
 

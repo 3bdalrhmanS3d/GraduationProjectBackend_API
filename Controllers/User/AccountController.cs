@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
-using GraduationProjectBackendAPI.Controllers.DOT;
+using GraduationProjectBackendAPI.Controllers.DOT.User;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
@@ -137,7 +137,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 PasswordHash = HashPassword(userInput.PasswordHash),
                 CreatedAt = DateTime.UtcNow,
                 Role = UserRole.RegularUser, 
-                ProfilePhoto = "/uploads/profile-pictures/default.png"
+                ProfilePhoto = "/uploads/profile-pictures/defult_user.webp"
             };
 
             _context.UsersT.Add(newUser);

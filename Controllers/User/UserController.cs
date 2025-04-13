@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
-using GraduationProjectBackendAPI.Controllers.DOT;
+using GraduationProjectBackendAPI.Controllers.DOT.User;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {

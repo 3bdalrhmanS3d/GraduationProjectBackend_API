@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace GraduationProjectBackendAPI.Controllers.DOT
+namespace GraduationProjectBackendAPI.Controllers.DOT.User
 {
     public class UserSignInInput
     {

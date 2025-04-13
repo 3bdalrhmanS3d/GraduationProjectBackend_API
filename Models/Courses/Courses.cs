@@ -18,6 +18,13 @@ namespace GraduationProjectBackendAPI.Models.Courses
 
         public string Description { get; set; }
         public DateTime CreatedAt { get; set; }
+
+        public string? CourseImage { get; set; }
+        public decimal CoursePrice { get; set; }
+
+        public bool IsActive { get; set; } = false;
+        public bool IsDeleted { get; set; } = false;
+
         public virtual Users User { get; set; }
 
         public ICollection<AboutCourse>? aboutCourses { get; set; }
