@@ -17,6 +17,9 @@ namespace GraduationProjectBackendAPI.Models.Courses
 
         public string LevelDetails { get; set; }
 
+        public bool IsVisible { get; set; } = true;
+        public bool RequiresPreviousLevelCompletion { get; set; } = false;
+
         // Navigation Properties
         public virtual Courses Course { get; set; }
         public ICollection<Section>? Sections { get; set; }

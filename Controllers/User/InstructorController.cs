@@ -501,6 +501,181 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
         #endregion
 
+        #region Level
+
+        // create level
+        [HttpPost("create-level")]
+        public async Task<IActionResult> CreateLevel([FromBody] CreateLevelInput input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var course = await _context.Courses.FirstOrDefaultAsync(c => c.CourseId == input.CourseId && c.InstructorId == instructorId);
+            if (course == null)
+                return NotFound(new { message = "Course not found or not owned by you." });
+
+            int nextOrder = await _context.Levels.Where(l => l.CourseId == input.CourseId).CountAsync() + 1;
+            
+            // if it's the first level, no need to require previous level completion
+            bool requiresPrevious = nextOrder == 1 ? false : true;
+
+            var level = new Level
+            {
+                CourseId = input.CourseId,
+                LevelOrder = nextOrder,
+                LevelName = input.LevelName.Trim(),
+                LevelDetails = input.LevelDetails?.Trim()!,
+                IsVisible = input.IsVisible,
+                RequiresPreviousLevelCompletion = requiresPrevious
+            };
+
+
+            _context.Levels.Add(level);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Level created successfully!", level });
+        }
+        
+        // update level
+        [HttpPut("update-level")]
+        public async Task<IActionResult> UpdateLevel([FromBody] UpdateLevelInput input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var level = await _context.Levels
+                .Include(l => l.Course)
+                .FirstOrDefaultAsync(l => l.LevelId == input.LevelId && l.Course.InstructorId == instructorId);
+
+            if (level == null)
+                return NotFound(new { message = "Level not found or not yours." });
+
+            if (!string.IsNullOrWhiteSpace(input.LevelName))
+                level.LevelName = input.LevelName.Trim();
+
+            if (!string.IsNullOrWhiteSpace(input.LevelDetails))
+                level.LevelDetails = input.LevelDetails.Trim();
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Level updated successfully!", level });
+        }
+
+        // delete level
+        [HttpDelete("delete-level/{levelId}")]
+        public async Task<IActionResult> DeleteLevel(int levelId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var level = await _context.Levels
+                .Include(l => l.Course)
+                .FirstOrDefaultAsync(l => l.LevelId == levelId && l.Course.InstructorId == instructorId);
+
+            if (level == null)
+                return NotFound(new { message = "Level not found or not yours." });
+
+            _context.Levels.Remove(level);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Level deleted successfully." });
+        }
+
+        // get all levels for this course
+        [HttpGet("course-levels/{courseId}")]
+        public async Task<IActionResult> GetCourseLevels(int courseId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var course = await _context.Courses.FirstOrDefaultAsync(c => c.CourseId == courseId && c.InstructorId == instructorId);
+            if (course == null)
+                return NotFound(new { message = "Course not found or not yours." });
+
+            var levels = await _context.Levels
+                .Where(l => l.CourseId == courseId)
+                .OrderBy(l => l.LevelOrder)
+                .ToListAsync();
+
+            return Ok(new { count = levels.Count, levels });
+        }
+
+        // show/ hide level
+        [HttpPost("toggle-level-visibility/{levelId}")]
+        public async Task<IActionResult> ToggleLevelVisibility(int levelId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var level = await _context.Levels
+                .Include(l => l.Course)
+                .FirstOrDefaultAsync(l => l.LevelId == levelId && l.Course.InstructorId == instructorId);
+
+            if (level == null)
+                return NotFound(new { message = "Level not found or not yours." });
+
+            level.IsVisible = !level.IsVisible;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = level.IsVisible ? "Level is now visible." : "Level is now hidden.",
+                status = level.IsVisible ? "visible" : "hidden"
+            });
+        }
+
+        // reorder levels
+        [HttpPost("reorder-course-levels")]
+        public async Task<IActionResult> ReorderLevels([FromBody] List<ReorderLevelInput> input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            foreach (var item in input)
+            {
+                var level = await _context.Levels
+                    .Include(l => l.Course)
+                    .FirstOrDefaultAsync(l => l.LevelId == item.LevelId && l.Course.InstructorId == instructorId);
+
+                if (level != null)
+                {
+                    level.LevelOrder = item.NewOrder;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Levels reordered successfully." });
+        }
+
+        // level status 
+        [HttpGet("level-stats/{levelId}")]
+        public async Task<IActionResult> GetLevelStats(int levelId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var level = await _context.Levels
+                .Include(l => l.Course)
+                .FirstOrDefaultAsync(l => l.LevelId == levelId && l.Course.InstructorId == instructorId);
+
+            if (level == null)
+                return NotFound(new { message = "Level not found or not yours." });
+
+            var usersReached = await _context.UserProgresses
+                .CountAsync(p => p.CurrentLevelId == levelId);
+
+            return Ok(new
+            {
+                level.LevelId,
+                level.LevelName,
+                usersReached
+            });
+        }
+
+        #endregion
+
+        #region Section
+
+        #endregion
 
         private int? GetUserIdFromToken()
         {
