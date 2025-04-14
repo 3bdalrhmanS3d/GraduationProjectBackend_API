@@ -37,7 +37,160 @@ namespace GraduationProjectBackendAPI.Controllers.User
         // level
         // section
 
-        #region Cousre
+        #region Track
+
+        // create track
+        [HttpPost("create-track")]
+        public async Task<IActionResult> CreateTrack([FromBody] CreateTrackInput input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null)
+                return Unauthorized();
+
+            var track = new CourseTrack
+            {
+                TrackName = input.TrackName.Trim(),
+                TrackDescription = input.TrackDescription?.Trim(),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.CourseTracks.Add(track);
+            await _context.SaveChangesAsync();
+
+            if (input.CourseIds != null && input.CourseIds.Any())
+            {
+                foreach (var courseId in input.CourseIds)
+                {
+                    var course = await _context.Courses.FirstOrDefaultAsync(c => c.CourseId == courseId && c.InstructorId == instructorId);
+                    if (course != null)
+                    {
+                        _context.CourseTrackCourses.Add(new CourseTrackCourse
+                        {
+                            TrackId = track.TrackId,
+                            CourseId = course.CourseId
+                        });
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new { message = "Track created successfully", trackId = track.TrackId });
+        }
+
+
+        // update track
+        [HttpPut("update-track/{trackId}")]
+        public async Task<IActionResult> UpdateTrack(int trackId, [FromBody] UpdateTrackInput input)
+        {
+            var track = await _context.CourseTracks.FindAsync(trackId);
+            if (track == null)
+                return NotFound(new { message = "Track not found." });
+
+            track.TrackName = input.TrackName?.Trim() ?? track.TrackName;
+            track.TrackDescription = input.TrackDescription?.Trim() ?? track.TrackDescription;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Track updated successfully", track });
+        }
+
+        // remove course from track
+        [HttpDelete("remove-course-from-track")]
+        public async Task<IActionResult> RemoveCourseFromTrack([FromQuery] int trackId, [FromQuery] int courseId)
+        {
+            var entry = await _context.CourseTrackCourses
+                .FirstOrDefaultAsync(x => x.TrackId == trackId && x.CourseId == courseId);
+
+            if (entry == null)
+                return NotFound(new { message = "Course not found in this track." });
+
+            _context.CourseTrackCourses.Remove(entry);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Course removed from track." });
+        }
+
+        // delete track
+        [HttpDelete("delete-track/{trackId}")]
+        public async Task<IActionResult> DeleteTrack(int trackId)
+        {
+            var track = await _context.CourseTracks
+                .Include(t => t.CourseTrackCourses)
+                .FirstOrDefaultAsync(t => t.TrackId == trackId);
+
+            if (track == null)
+                return NotFound(new { message = "Track not found." });
+
+            _context.CourseTrackCourses.RemoveRange(track.CourseTrackCourses);
+            _context.CourseTracks.Remove(track);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Track deleted successfully." });
+        }
+
+
+        // add course to track
+        [HttpPost("add-course-to-track")]
+        public async Task<IActionResult> AddCourseToTrack([FromBody] AddCourseToTrackInput input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null)
+                return Unauthorized();
+
+            var course = await _context.Courses.FirstOrDefaultAsync(c => c.CourseId == input.CourseId && c.InstructorId == instructorId);
+            if (course == null)
+                return BadRequest(new { message = "Course not found or not yours." });
+
+            var exists = await _context.CourseTrackCourses.AnyAsync(x => x.TrackId == input.TrackId && x.CourseId == input.CourseId);
+            if (exists)
+                return BadRequest(new { message = "Course already exists in this track." });
+
+            _context.CourseTrackCourses.Add(new CourseTrackCourse
+            {
+                TrackId = input.TrackId,
+                CourseId = input.CourseId
+            });
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Course added to track." });
+        }
+
+        // get all tracks
+        [HttpGet("all-tracks")]
+        public async Task<IActionResult> GetAllTracks()
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null)
+                return Unauthorized();
+
+            var tracks = await _context.CourseTracks
+                .Include(t => t.CourseTrackCourses)
+                .ThenInclude(ctc => ctc.Courses)
+                .Where(t => t.CourseTrackCourses.Any(c => c.Courses.InstructorId == instructorId))
+                .ToListAsync();
+
+            var result = tracks.Select(track => new
+            {
+                track.TrackId,
+                track.TrackName,
+                track.TrackDescription,
+                track.CreatedAt,
+                Courses = track.CourseTrackCourses.Select(c => new
+                {
+                    c.CourseId,
+                    c.Courses.CourseName,
+                    c.Courses.CourseImage
+                })
+            });
+
+            return Ok(result);
+        }
+
+        #endregion
+
+        #region Course
 
         // Get all courses for this instructor
         [HttpGet("all-courses-for-me")]
@@ -349,7 +502,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
         #endregion
 
 
-
         private int? GetUserIdFromToken()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -366,7 +518,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return string.Empty;
 
             // Remove extra spaces
-            skill = skill.Trim();                          // Trim spaces at ends
+            skill = skill.Trim();       // Trim spaces at ends
             skill = System.Text.RegularExpressions.Regex.Replace(skill, @"\s+", " "); // Remove inner double spaces
 
             // Capitalize first letter

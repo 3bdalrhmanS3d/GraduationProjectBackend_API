@@ -54,6 +54,9 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<CourseFeedback> CourseFeedbacks { get; set; }
 
         public DbSet<FavoriteCourse> FavoriteCourses { get; set; }
+        public DbSet<CourseTrack> CourseTracks { get; set; }
+        public DbSet<CourseTrackCourse> CourseTrackCourses { get; set; }
+
         // DbSets for the existing models
 
         public DbSet<Question> Questions { get; set; }
