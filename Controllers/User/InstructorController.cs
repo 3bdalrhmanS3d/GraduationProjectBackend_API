@@ -675,6 +675,183 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
         #region Section
 
+        // create section
+        [HttpPost("create-section")]
+        public async Task<IActionResult> CreateSection([FromBody] CreateSectionInput input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var level = await _context.Levels
+                .Include(l => l.Course)
+                .FirstOrDefaultAsync(l => l.LevelId == input.LevelId && l.Course.InstructorId == instructorId);
+
+            if (level == null)
+                return NotFound(new { message = "Level not found or not yours." });
+
+            int nextOrder = await _context.Sections
+                .Where(s => s.LevelId == input.LevelId)
+                .CountAsync() + 1;
+
+            // if it's the first section, no need to require previous section completion
+            bool requiresPrevious = nextOrder == 1 ? false : true;
+
+            var section = new Section
+            {
+                LevelId = input.LevelId,
+                SectionName = input.SectionName.Trim(),
+                SectionOrder = nextOrder,
+                
+                RequiresPreviousSectionCompletion = requiresPrevious
+
+            };
+
+            _context.Sections.Add(section);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Section created successfully!", section });
+        }
+
+        // update section
+        [HttpPut("update-section")]
+        public async Task<IActionResult> UpdateSection([FromBody] UpdateSectionInput input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var section = await _context.Sections
+                .Include(s => s.Level)
+                .ThenInclude(l => l.Course)
+                .FirstOrDefaultAsync(s => s.SectionId == input.SectionId && s.Level.Course.InstructorId == instructorId);
+
+            if (section == null)
+                return NotFound(new { message = "Section not found or not yours." });
+
+            if (!string.IsNullOrWhiteSpace(input.SectionName))
+                section.SectionName = input.SectionName.Trim();
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Section updated successfully!", section });
+        }
+
+        // delete section
+        [HttpDelete("delete-section/{sectionId}")]
+        public async Task<IActionResult> DeleteSection(int sectionId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var section = await _context.Sections
+                .Include(s => s.Level)
+                .ThenInclude(l => l.Course)
+                .FirstOrDefaultAsync(s => s.SectionId == sectionId && s.Level.Course.InstructorId == instructorId);
+
+            if (section == null)
+                return NotFound(new { message = "Section not found or not yours." });
+
+            _context.Sections.Remove(section);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Section deleted successfully." });
+        }
+
+        // get all sections for this level
+        [HttpGet("level-sections/{levelId}")]
+        public async Task<IActionResult> GetSectionsByLevel(int levelId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var level = await _context.Levels
+                .Include(l => l.Course)
+                .FirstOrDefaultAsync(l => l.LevelId == levelId && l.Course.InstructorId == instructorId);
+
+            if (level == null)
+                return NotFound(new { message = "Level not found or not yours." });
+
+            var sections = await _context.Sections
+                .Where(s => s.LevelId == levelId)
+                .OrderBy(s => s.SectionOrder)
+                .ToListAsync();
+
+            return Ok(new { count = sections.Count, sections });
+        }
+
+        // reorder sections
+        [HttpPost("reorder-sections")]
+        public async Task<IActionResult> ReorderSections([FromBody] List<ReorderSectionInput> input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            foreach (var item in input)
+            {
+                var section = await _context.Sections
+                    .Include(s => s.Level)
+                    .ThenInclude(l => l.Course)
+                    .FirstOrDefaultAsync(s => s.SectionId == item.SectionId && s.Level.Course.InstructorId == instructorId);
+
+                if (section != null)
+                {
+                    section.SectionOrder = item.NewOrder;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Sections reordered successfully." });
+        }
+
+        // toggle section visibility
+        [HttpPost("toggle-section-visibility/{sectionId}")]
+        public async Task<IActionResult> ToggleSectionVisibility(int sectionId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var section = await _context.Sections
+                .Include(s => s.Level)
+                .ThenInclude(l => l.Course)
+                .FirstOrDefaultAsync(s => s.SectionId == sectionId && s.Level.Course.InstructorId == instructorId);
+
+            if (section == null)
+                return NotFound(new { message = "Section not found or not yours." });
+
+            section.IsVisible = !section.IsVisible;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = section.IsVisible ? "Section is now visible." : "Section is now hidden.",
+                status = section.IsVisible ? "visible" : "hidden"
+            });
+        }
+
+        // section status 
+        [HttpGet("section-stats/{sectionId}")]
+        public async Task<IActionResult> GetSectionStats(int sectionId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var section = await _context.Sections
+                .Include(s => s.Level)
+                .ThenInclude(l => l.Course)
+                .FirstOrDefaultAsync(s => s.SectionId == sectionId && s.Level.Course.InstructorId == instructorId);
+
+            if (section == null)
+                return NotFound(new { message = "Section not found or not yours." });
+
+            var usersReached = await _context.UserProgresses
+                .CountAsync(p => p.CurrentSectionId == sectionId);
+
+            return Ok(new
+            {
+                section.SectionId,
+                section.SectionName,
+                usersReached
+            });
+        }
+
         #endregion
 
         private int? GetUserIdFromToken()

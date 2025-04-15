@@ -14,6 +14,8 @@ namespace GraduationProjectBackendAPI.Models.Courses
         public string SectionName { get; set; }
         public int SectionOrder { get; set; }
 
+        public bool IsVisible { get; set; } = true;
+        public bool RequiresPreviousSectionCompletion { get; set; } = false;
 
         // Navigation Properties
         public virtual Level Level { get; set; }
