@@ -4,6 +4,7 @@ using GraduationProjectBackendAPI.Models.AppDBContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GraduationProjectBackendAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250415174106_editContentCourse")]
+    partial class editContentCourse
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -672,10 +674,6 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     b.HasIndex("CourseId");
 
-                    b.HasIndex("CurrentLevelId");
-
-                    b.HasIndex("CurrentSectionId");
-
                     b.HasIndex("UserId");
 
                     b.ToTable("UserProgresses");
@@ -1237,18 +1235,6 @@ namespace GraduationProjectBackendAPI.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Level", "CurrentLevel")
-                        .WithMany()
-                        .HasForeignKey("CurrentLevelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Section", "CurrentSection")
-                        .WithMany()
-                        .HasForeignKey("CurrentSectionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
                         .WithMany("UserProgresses")
                         .HasForeignKey("UserId")
@@ -1256,10 +1242,6 @@ namespace GraduationProjectBackendAPI.Migrations
                         .IsRequired();
 
                     b.Navigation("Course");
-
-                    b.Navigation("CurrentLevel");
-
-                    b.Navigation("CurrentSection");
 
                     b.Navigation("User");
                 });

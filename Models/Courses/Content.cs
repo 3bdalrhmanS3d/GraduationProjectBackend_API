@@ -18,12 +18,16 @@ namespace GraduationProjectBackendAPI.Models.Courses
 
         [ForeignKey("Section")]
         public int SectionId { get; set; } // Foreign Key
+        public string Title { get; set; } = string.Empty;
         public ContentType ContentType { get; set; } = ContentType.Text;
         public string? ContentUrl { get; set; } // if video 
         public string? ContentText { get; set; } // if text 
-        public string? ContentDoc { get; set; } // if doc 
-        public int DurationInMinutes { get; set; }
-
+        public string? ContentDoc { get; set; } // if doc
+        public int DurationInMinutes { get; set; } = 0;
+        public int ContentOrder { get; set; } = 0; 
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public string? ContentDescription { get; set; }
+        public bool IsVisible { get; set; } = true;
         public virtual Section Section { get; set; }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using GraduationProjectBackendAPI.Controllers.DOT.Courses;
+using GraduationProjectBackendAPI.Controllers.DTO.Courses;
 using GraduationProjectBackendAPI.Models.AppDBContext;
 using GraduationProjectBackendAPI.Models.Courses;
+using GraduationProjectBackendAPI.Models.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +38,9 @@ namespace GraduationProjectBackendAPI.Controllers.User
         // course 
         // level
         // section
+        // content
+        // quiz
+        // task
 
         #region Track
 
@@ -185,6 +190,37 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 })
             });
 
+            return Ok(result);
+        }
+
+        // get track details
+        [HttpGet("track-details/{trackId}")]
+        public async Task<IActionResult> GetTrackDetails(int trackId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null)
+                return Unauthorized();
+
+            var track = await _context.CourseTracks
+                .Include(t => t.CourseTrackCourses)
+                .ThenInclude(ctc => ctc.Courses)
+                .FirstOrDefaultAsync(t => t.TrackId == trackId && t.CourseTrackCourses.Any(c => c.Courses.InstructorId == instructorId));
+            
+            if (track == null)
+                return NotFound(new { message = "Track not found or not yours." });
+            var result = new
+            {
+                track.TrackId,
+                track.TrackName,
+                track.TrackDescription,
+                track.CreatedAt,
+                Courses = track.CourseTrackCourses.Select(c => new
+                {
+                    c.CourseId,
+                    c.Courses.CourseName,
+                    c.Courses.CourseImage
+                })
+            };
             return Ok(result);
         }
 
@@ -498,7 +534,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return Ok(new { message = "Course image uploaded successfully.", course.CourseImage });
         }
 
-
+        
         #endregion
 
         #region Level
@@ -755,28 +791,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return Ok(new { message = "Section deleted successfully." });
         }
 
-        // get all sections for this level
-        [HttpGet("level-sections/{levelId}")]
-        public async Task<IActionResult> GetSectionsByLevel(int levelId)
-        {
-            var instructorId = GetUserIdFromToken();
-            if (instructorId == null) return Unauthorized();
-
-            var level = await _context.Levels
-                .Include(l => l.Course)
-                .FirstOrDefaultAsync(l => l.LevelId == levelId && l.Course.InstructorId == instructorId);
-
-            if (level == null)
-                return NotFound(new { message = "Level not found or not yours." });
-
-            var sections = await _context.Sections
-                .Where(s => s.LevelId == levelId)
-                .OrderBy(s => s.SectionOrder)
-                .ToListAsync();
-
-            return Ok(new { count = sections.Count, sections });
-        }
-
         // reorder sections
         [HttpPost("reorder-sections")]
         public async Task<IActionResult> ReorderSections([FromBody] List<ReorderSectionInput> input)
@@ -851,9 +865,205 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 usersReached
             });
         }
-
         #endregion
 
+        #region Content
+
+        // create content
+        [HttpPost("create-content")]
+        public async Task<IActionResult> CreateContent([FromBody] CreateContentInput input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var section = await _context.Sections
+                .Include(s => s.Level)
+                .ThenInclude(l => l.Course)
+                .FirstOrDefaultAsync(s => s.SectionId == input.SectionId && s.Level.Course.InstructorId == instructorId);
+
+            if (section == null)
+                return NotFound(new { message = "Section not found or not yours." });
+
+            if (input.ContentType == DTO.Courses.ContentType.Video && string.IsNullOrWhiteSpace(input.ContentUrl))
+                return BadRequest(new { message = "Video URL is required for video content." });
+
+            if (input.ContentType == DTO.Courses.ContentType.Doc && string.IsNullOrWhiteSpace(input.ContentDoc))
+                return BadRequest(new { message = "Document path is required for doc content." });
+
+            if (input.ContentType == DTO.Courses.ContentType.Text && string.IsNullOrWhiteSpace(input.ContentText))
+                return BadRequest(new { message = "Text is required for text content." });
+
+            int nextOrder = await _context.Contents
+                .Where(c => c.SectionId == input.SectionId)
+                .CountAsync() + 1;
+
+            var content = new Content
+            {
+                SectionId = input.SectionId,
+                Title = input.Title.Trim(),
+                ContentType = (Models.Courses.ContentType)input.ContentType,
+                ContentText = input.ContentType == DTO.Courses.ContentType.Text ? input.ContentText : null,
+                ContentUrl = input.ContentType == DTO.Courses.ContentType.Video ? input.ContentUrl : null,
+                ContentDoc = input.ContentType == DTO.Courses.ContentType.Doc ? input.ContentDoc : null,
+                DurationInMinutes = input.DurationInMinutes,
+                ContentDescription = input.ContentDescription,
+                ContentOrder = nextOrder
+            };
+
+
+            _context.Contents.Add(content);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Content created successfully.", content });
+        }
+
+        [HttpPost("upload-content-file")]
+        public async Task<IActionResult> UploadContentFile(IFormFile file, [FromQuery] DTO.Courses.ContentType type)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file uploaded." });
+
+            var folderName = type == DTO.Courses.ContentType.Video ? "videos" : "docs";
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", folderName);
+
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var extension = Path.GetExtension(file.FileName);
+            var fileName = $"{Guid.NewGuid()}{extension}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var url = $"/uploads/{folderName}/{fileName}";
+            return Ok(new { message = "File uploaded successfully.", url });
+        }
+
+        // update content
+        [HttpPut("update-content")]
+        public async Task<IActionResult> UpdateContent([FromBody] UpdateContentInput input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var content = await _context.Contents
+                .Include(c => c.Section)
+                .ThenInclude(s => s.Level)
+                .ThenInclude(l => l.Course)
+                .FirstOrDefaultAsync(c => c.ContentId == input.ContentId && c.Section.Level.Course.InstructorId == instructorId);
+
+            if (content == null)
+                return NotFound(new { message = "Content not found or not yours." });
+
+            if (!string.IsNullOrWhiteSpace(input.Title))
+                content.Title = input.Title.Trim();
+
+            if (!string.IsNullOrWhiteSpace(input.ContentDescription))
+                content.ContentDescription = input.ContentDescription.Trim();
+
+            if (input.DurationInMinutes.HasValue)
+                content.DurationInMinutes = input.DurationInMinutes.Value;
+
+
+            if (content.ContentType == Models.Courses.ContentType.Text && !string.IsNullOrWhiteSpace(input.ContentText))
+            {
+                content.ContentText = input.ContentText;
+            }
+
+            if (content.ContentType == Models.Courses.ContentType.Video && !string.IsNullOrWhiteSpace(input.ContentUrl))
+            {
+                content.ContentUrl = input.ContentUrl;
+            }
+
+            if (content.ContentType == Models.Courses.ContentType.Doc && !string.IsNullOrWhiteSpace(input.ContentDoc))
+            {
+                content.ContentDoc = input.ContentDoc;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Content updated successfully.", content });
+        }
+
+
+        // delete content
+        [HttpDelete("delete-content/{contentId}")]
+        public async Task<IActionResult> DeleteContent(int contentId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var content = await _context.Contents
+                .Include(c => c.Section)
+                .ThenInclude(s => s.Level)
+                .ThenInclude(l => l.Course)
+                .FirstOrDefaultAsync(c => c.ContentId == contentId && c.Section.Level.Course.InstructorId == instructorId);
+
+            if (content == null)
+                return NotFound(new { message = "Content not found or not yours." });
+
+            _context.Contents.Remove(content);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Content deleted successfully." });
+        }
+
+        // reorder contents
+        [HttpPost("reorder-contents")]
+        public async Task<IActionResult> ReorderContents([FromBody] List<ReorderContentInput> input)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            foreach (var item in input)
+            {
+                var content = await _context.Contents
+                    .Include(c => c.Section)
+                    .ThenInclude(s => s.Level)
+                    .ThenInclude(l => l.Course)
+                    .FirstOrDefaultAsync(c => c.ContentId == item.ContentId && c.Section.Level.Course.InstructorId == instructorId);
+
+                if (content != null)
+                {
+                    content.ContentOrder = item.NewOrder;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Content reordered successfully." });
+        }
+
+        // toggle content visibility
+        [HttpPost("toggle-content-visibility/{contentId}")]
+        public async Task<IActionResult> ToggleContentVisibility(int contentId)
+        {
+            var instructorId = GetUserIdFromToken();
+            if (instructorId == null) return Unauthorized();
+
+            var content = await _context.Contents
+                .Include(c => c.Section)
+                .ThenInclude(s => s.Level)
+                .ThenInclude(l => l.Course)
+                .FirstOrDefaultAsync(c => c.ContentId == contentId && c.Section.Level.Course.InstructorId == instructorId);
+
+            if (content == null)
+                return NotFound(new { message = "Content not found or not yours." });
+
+            content.IsVisible = !content.IsVisible;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = content.IsVisible ? "Content is now visible." : "Content is now hidden.",
+                status = content.IsVisible ? "visible" : "hidden"
+            });
+        }
+
+
+        #endregion
+        
         private int? GetUserIdFromToken()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

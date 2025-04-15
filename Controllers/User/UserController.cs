@@ -311,6 +311,221 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return Ok(new { message = "Profile photo deleted successfully. Default photo restored.", profilePhotoUrl = user.ProfilePhoto });
         }
 
+
+
+        [HttpGet("all-tracks")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetAllTracks()
+        {
+            var tracks = await _context.CourseTracks
+                .Include(t => t.CourseTrackCourses)
+                .ThenInclude(ctc => ctc.Courses)
+                .ToListAsync();
+
+            var result = tracks.Select(track => new
+            {
+                track.TrackId,
+                track.TrackName,
+                track.TrackDescription,
+                CourseCount = track.CourseTrackCourses
+                    .Count(c => !c.Courses.IsDeleted && c.Courses.IsActive)
+            });
+
+            return Ok(new
+            {
+                totalTracks = result.Count(),
+                tracks = result
+            });
+        }
+
+        [HttpGet("track-courses/{trackId}")]
+        [AllowAnonymous] // or [Authorize] if needed
+        public async Task<IActionResult> GetCoursesInTrack(int trackId)
+        {
+            var track = await _context.CourseTracks
+                .Include(t => t.CourseTrackCourses)
+                    .ThenInclude(ctc => ctc.Courses)
+                        .ThenInclude(c => c.User)
+                .Include(t => t.CourseTrackCourses)
+                    .ThenInclude(ctc => ctc.Courses)
+                        .ThenInclude(c => c.Levels)
+                .FirstOrDefaultAsync(t => t.TrackId == trackId);
+
+            if (track == null)
+                return NotFound(new { message = "Track not found." });
+
+            var courses = track.CourseTrackCourses
+                .Where(ctc => !ctc.Courses.IsDeleted && ctc.Courses.IsActive)
+                .Select(ctc => new
+                {
+                    ctc.Courses.CourseId,
+                    ctc.Courses.CourseName,
+                    ctc.Courses.Description,
+                    ctc.Courses.CourseImage,
+                    ctc.Courses.CoursePrice,
+                    ctc.Courses.CreatedAt,
+                    InstructorName = ctc.Courses.User.FullName,
+                    LevelsCount = ctc.Courses.Levels?.Count ?? 0
+                }).ToList();
+
+            return Ok(new
+            {
+                track.TrackId,
+                track.TrackName,
+                track.TrackDescription,
+                totalCourses = courses.Count,
+                courses
+            });
+        }
+
+        [HttpGet("course-levels/{courseId}")]
+        public async Task<IActionResult> GetCourseLevels(int courseId)
+        {
+            var course = await _context.Courses
+                .Include(c => c.Levels.OrderBy(l => l.LevelOrder))
+                .FirstOrDefaultAsync(c => c.CourseId == courseId);
+
+            if (course == null)
+                return NotFound(new { message = "Course not found." });
+
+            var levels = course.Levels.Select(level => new
+            {
+                level.LevelId,
+                level.LevelName,
+                level.LevelDetails,
+                level.LevelOrder,
+                level.IsVisible
+            }).ToList();
+
+            return Ok(new
+            {
+                course.CourseId,
+                course.CourseName,
+                levelsCount = levels.Count,
+                levels
+            });
+        }
+
+        [HttpGet("level-sections/{levelId}")]
+        public async Task<IActionResult> GetLevelSections(int levelId)
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null) return Unauthorized();
+
+            var level = await _context.Levels
+                .Include(l => l.Sections.OrderBy(s => s.SectionOrder))
+                .Include(l => l.Course)
+                .FirstOrDefaultAsync(l => l.LevelId == levelId);
+
+            if (level == null)
+                return NotFound(new { message = "Level not found." });
+
+            var userProgress = await _context.UserProgresses
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.CourseId == level.Course.CourseId);
+
+            var sections = level.Sections.Select(section => new
+            {
+                section.SectionId,
+                section.SectionName,
+                section.SectionOrder,
+                isCurrent = userProgress != null && userProgress.CurrentSectionId == section.SectionId,
+                isCompleted = userProgress != null && section.SectionOrder < level.Sections
+                    .FirstOrDefault(s => s.SectionId == userProgress.CurrentSectionId)?.SectionOrder
+            }).ToList();
+
+            return Ok(new
+            {
+                level.LevelId,
+                level.LevelName,
+                level.LevelDetails,
+                sections
+            });
+        }
+
+        [HttpGet("section-contents/{sectionId}")]
+        public async Task<IActionResult> GetSectionContents(int sectionId)
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null) return Unauthorized();
+
+            var section = await _context.Sections
+                .Include(s => s.Contents.OrderBy(c => c.ContentId))
+                .Include(s => s.Level)
+                .FirstOrDefaultAsync(s => s.SectionId == sectionId);
+
+            if (section == null)
+                return NotFound(new { message = "Section not found." });
+
+            var contents = section.Contents.Select(c => new
+            {
+                c.ContentId,
+                c.ContentType,
+                c.ContentText,
+                c.ContentDoc,
+                c.ContentUrl,
+                c.DurationInMinutes
+            });
+
+            return Ok(new
+            {
+                section.SectionId,
+                section.SectionName,
+                contents
+            });
+        }
+
+        [HttpPost("complete-section/{currentSectionId}")]
+        public async Task<IActionResult> CompleteSection(int currentSectionId)
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null) return Unauthorized();
+
+            var currentSection = await _context.Sections
+                .Include(s => s.Level)
+                .FirstOrDefaultAsync(s => s.SectionId == currentSectionId);
+
+            if (currentSection == null)
+                return NotFound(new { message = "Section not found." });
+
+            var allSections = await _context.Sections
+                .Where(s => s.LevelId == currentSection.LevelId)
+                .OrderBy(s => s.SectionOrder)
+                .ToListAsync();
+
+            var currentIndex = allSections.FindIndex(s => s.SectionId == currentSectionId);
+            var nextSection = currentIndex + 1 < allSections.Count ? allSections[currentIndex + 1] : null;
+
+            var userProgress = await _context.UserProgresses
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.CourseId == currentSection.Level.CourseId);
+
+            if (userProgress == null)
+            {
+                userProgress = new UserProgress
+                {
+                    UserId = userId.Value,
+                    CourseId = currentSection.Level.CourseId,
+                    CurrentLevelId = currentSection.LevelId,
+                    CurrentSectionId = nextSection?.SectionId ?? currentSectionId,
+                    LastUpdated = DateTime.UtcNow
+                };
+                _context.UserProgresses.Add(userProgress);
+            }
+            else
+            {
+                userProgress.CurrentLevelId = currentSection.LevelId;
+                userProgress.CurrentSectionId = nextSection?.SectionId ?? currentSectionId;
+                userProgress.LastUpdated = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = nextSection != null ? "Moved to next section." : "This was the last section in this level.",
+                nextSectionId = nextSection?.SectionId
+            });
+        }
+
         private int? GetUserIdFromToken()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
