@@ -37,6 +37,7 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<AdminActionLog> adminActionLogs { get; set; }
 
         public DbSet<Notification> NotificationT { get; set; }
+        public DbSet<InstructorActionLog> InstructorActionLogs { get; set; }
         // Courses Platform Tables
         public DbSet<Courses.Courses> Courses { get; set; }
         public DbSet<Level> Levels { get; set; }

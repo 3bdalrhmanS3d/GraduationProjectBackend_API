@@ -14,6 +14,8 @@ namespace GraduationProjectBackendAPI.Models.Courses
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        public virtual ICollection<CourseTrackCourse> CourseTrackCourses { get; set; }
+        public string? TrackImage { get; set; }
+
+        public virtual ICollection<CourseTrackCourse>? CourseTrackCourses { get; set; }
     }
 }

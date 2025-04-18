@@ -4,6 +4,7 @@ using GraduationProjectBackendAPI.Models.AppDBContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GraduationProjectBackendAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250418074410_InstructorActionLog")]
+    partial class InstructorActionLog
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -387,9 +389,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Property<int>("CourseId")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("IsVisible")
                         .HasColumnType("bit");
 
@@ -534,9 +533,6 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SectionId"), 1L, 1);
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("IsVisible")
                         .HasColumnType("bit");
 
@@ -665,9 +661,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Property<int>("CourseId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("CurrentContentId")
-                        .HasColumnType("int");
-
                     b.Property<int>("CurrentLevelId")
                         .HasColumnType("int");
 
@@ -683,8 +676,6 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.HasKey("UserProgressId");
 
                     b.HasIndex("CourseId");
-
-                    b.HasIndex("CurrentContentId");
 
                     b.HasIndex("CurrentLevelId");
 
@@ -1280,10 +1271,6 @@ namespace GraduationProjectBackendAPI.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Content", "CurrentContent")
-                        .WithMany()
-                        .HasForeignKey("CurrentContentId");
-
                     b.HasOne("GraduationProjectBackendAPI.Models.Courses.Level", "CurrentLevel")
                         .WithMany()
                         .HasForeignKey("CurrentLevelId")
@@ -1303,8 +1290,6 @@ namespace GraduationProjectBackendAPI.Migrations
                         .IsRequired();
 
                     b.Navigation("Course");
-
-                    b.Navigation("CurrentContent");
 
                     b.Navigation("CurrentLevel");
 
@@ -1473,9 +1458,11 @@ namespace GraduationProjectBackendAPI.Migrations
                 {
                     b.Navigation("Contents");
 
-                    b.Navigation("Quiz");
+                    b.Navigation("Quiz")
+                        .IsRequired();
 
-                    b.Navigation("Task");
+                    b.Navigation("Task")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.TaskT", b =>

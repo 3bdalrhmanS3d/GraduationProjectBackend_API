@@ -17,6 +17,7 @@ namespace GraduationProjectBackendAPI.Models.Courses
 
         public string LevelDetails { get; set; }
 
+        public bool IsDeleted { get; set; } = false;
         public bool IsVisible { get; set; } = true;
         public bool RequiresPreviousLevelCompletion { get; set; } = false;
 

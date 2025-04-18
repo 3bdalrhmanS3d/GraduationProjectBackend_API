@@ -29,7 +29,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
         /// </summary>
         public void QueueResendEmail(string email, string fullName, string code)
         {
-            _emailQueue.Enqueue((email, fullName, code, null, true));
+            _emailQueue.Enqueue((email, fullName, code, null, true)!);
         }
 
         /// <summary>

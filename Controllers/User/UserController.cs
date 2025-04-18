@@ -5,7 +5,6 @@ using GraduationProjectBackendAPI.Models.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using GraduationProjectBackendAPI.Controllers.DOT.User;
 
@@ -313,12 +312,14 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
 
 
+        // For user with course
+
         [HttpGet("all-tracks")]
         [AllowAnonymous]
         public async Task<IActionResult> GetAllTracks()
         {
             var tracks = await _context.CourseTracks
-                .Include(t => t.CourseTrackCourses)
+                .Include(t => t.CourseTrackCourses)!
                 .ThenInclude(ctc => ctc.Courses)
                 .ToListAsync();
 
@@ -327,9 +328,11 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 track.TrackId,
                 track.TrackName,
                 track.TrackDescription,
-                CourseCount = track.CourseTrackCourses
+                CourseCount = track.CourseTrackCourses!
                     .Count(c => !c.Courses.IsDeleted && c.Courses.IsActive)
             });
+            if (!result.Any())
+                return NotFound(new { message = "No tracks found." });
 
             return Ok(new
             {
@@ -378,17 +381,68 @@ namespace GraduationProjectBackendAPI.Controllers.User
             });
         }
 
+        // for search
+        [HttpGet("all-courses-for-me")]
+        public async Task<IActionResult> GetAllCourses([FromQuery] string? search)
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null)
+                return Unauthorized(new { message = "Invalid or missing token." });
+
+            var coursesQuery = _context.Courses
+                .Where(c => !c.IsDeleted && c.IsActive);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                search = search.ToLower();
+                coursesQuery = coursesQuery.Where(c =>
+                    c.CourseName.ToLower().Contains(search) ||
+                    c.Description.ToLower().Contains(search));
+            }
+
+            var courses = await coursesQuery.ToListAsync();
+
+            if (!courses.Any())
+                return NotFound(new { message = "No courses found." });
+
+
+            var result = courses.Select(c => new
+            {
+                c.CourseId,
+                c.CourseName,
+                c.Description,
+                c.CourseImage,
+                c.CoursePrice,
+            }
+            );
+            return Ok(new
+            {
+                message = "Filtered courses fetched successfully.",
+                count = result.Count(),
+                courses = result
+            });
+        }
+
         [HttpGet("course-levels/{courseId}")]
         public async Task<IActionResult> GetCourseLevels(int courseId)
         {
+            var userId = GetUserIdFromToken();
+            if (userId == null) return Unauthorized();
+
+            var enrolled = await _context.CourseEnrollments
+                .AnyAsync(e => e.UserId == userId && e.CourseId == courseId);
+
+            if (!enrolled)
+                return NotFound(new { message = "You are not enrolled in this course." });
+
             var course = await _context.Courses
-                .Include(c => c.Levels.OrderBy(l => l.LevelOrder))
-                .FirstOrDefaultAsync(c => c.CourseId == courseId);
+                .Include(c => c.Levels!.Where(l => !l.IsDeleted && l.IsVisible).OrderBy(l => l.LevelOrder))
+                .FirstOrDefaultAsync(c => c.CourseId == courseId && !c.IsDeleted);
 
             if (course == null)
                 return NotFound(new { message = "Course not found." });
 
-            var levels = course.Levels.Select(level => new
+            var levels = course.Levels!.Select(level => new
             {
                 level.LevelId,
                 level.LevelName,
@@ -397,14 +451,20 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 level.IsVisible
             }).ToList();
 
+            if (!levels.Any())
+                return NotFound(new { message = "No levels found for this course." });
+
             return Ok(new
             {
                 course.CourseId,
                 course.CourseName,
+                course.Description,
+                course.CourseImage,
                 levelsCount = levels.Count,
                 levels
             });
         }
+
 
         [HttpGet("level-sections/{levelId}")]
         public async Task<IActionResult> GetLevelSections(int levelId)
@@ -412,26 +472,43 @@ namespace GraduationProjectBackendAPI.Controllers.User
             var userId = GetUserIdFromToken();
             if (userId == null) return Unauthorized();
 
+            // Get level and its course
             var level = await _context.Levels
-                .Include(l => l.Sections.OrderBy(s => s.SectionOrder))
+                .Include(l => l.Sections!.OrderBy(s => s.SectionOrder))
                 .Include(l => l.Course)
-                .FirstOrDefaultAsync(l => l.LevelId == levelId);
+                .FirstOrDefaultAsync(l => l.LevelId == levelId && !l.IsDeleted);
 
-            if (level == null)
+            if (level == null )
                 return NotFound(new { message = "Level not found." });
 
+            // Ensure user is enrolled in the same course
+            var enrolled = await _context.CourseEnrollments
+                .AnyAsync(e => e.UserId == userId && e.CourseId == level.Course.CourseId);
+
+            if (!enrolled)
+                return NotFound(new { message = "You are not enrolled in this course." });
+
+            // Get user progress if exists
             var userProgress = await _context.UserProgresses
                 .FirstOrDefaultAsync(p => p.UserId == userId && p.CourseId == level.Course.CourseId);
 
-            var sections = level.Sections.Select(section => new
-            {
-                section.SectionId,
-                section.SectionName,
-                section.SectionOrder,
-                isCurrent = userProgress != null && userProgress.CurrentSectionId == section.SectionId,
-                isCompleted = userProgress != null && section.SectionOrder < level.Sections
-                    .FirstOrDefault(s => s.SectionId == userProgress.CurrentSectionId)?.SectionOrder
-            }).ToList();
+            // Filter and build section list
+            var sections = level.Sections!
+                .Where(s => !s.IsDeleted && s.IsVisible)
+                .OrderBy(s => s.SectionOrder)
+                .Select(section => new
+                {
+                    section.SectionId,
+                    section.SectionName,
+                    section.SectionOrder,
+                    isCurrent = userProgress != null && userProgress.CurrentSectionId == section.SectionId,
+                    isCompleted = userProgress != null && section.SectionOrder <
+                        level.Sections!.FirstOrDefault(s => s.SectionId == userProgress.CurrentSectionId)?.SectionOrder
+                })
+                .ToList();
+
+            if (!sections.Any())
+                return NotFound(new { message = "No sections found for this level." });
 
             return Ok(new
             {
@@ -446,30 +523,43 @@ namespace GraduationProjectBackendAPI.Controllers.User
         public async Task<IActionResult> GetSectionContents(int sectionId)
         {
             var userId = GetUserIdFromToken();
-            if (userId == null) return Unauthorized();
+            if (userId == null) 
+                return Unauthorized();
 
             var section = await _context.Sections
-                .Include(s => s.Contents.OrderBy(c => c.ContentId))
                 .Include(s => s.Level)
-                .FirstOrDefaultAsync(s => s.SectionId == sectionId);
+                .ThenInclude(l => l.Course)
+                .Include(s => s.Contents!.Where(c => c.IsVisible).OrderBy(c => c.ContentOrder))
+                .FirstOrDefaultAsync(s => s.SectionId == sectionId && !s.IsDeleted && s.IsVisible);
 
             if (section == null)
-                return NotFound(new { message = "Section not found." });
+                return NotFound(new { message = "Section not found or not accessible." });
 
-            var contents = section.Contents.Select(c => new
+            var enrolled = await _context.CourseEnrollments
+                .AnyAsync(e => e.UserId == userId && e.CourseId == section.Level.CourseId);
+
+            if (!enrolled)
+                return Forbid("You are not enrolled in this course.");
+
+            var contents = section.Contents!.Select(c => new
             {
                 c.ContentId,
+                c.Title,
                 c.ContentType,
                 c.ContentText,
                 c.ContentDoc,
                 c.ContentUrl,
-                c.DurationInMinutes
+                c.DurationInMinutes,
+                c.ContentDescription
             });
+            if (!contents.Any())
+                return NotFound(new { message = "No contents found for this section." });
 
             return Ok(new
             {
                 section.SectionId,
                 section.SectionName,
+                contentsCount = contents.Count(),
                 contents
             });
         }

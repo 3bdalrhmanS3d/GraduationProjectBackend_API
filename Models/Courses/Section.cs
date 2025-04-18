@@ -14,13 +14,14 @@ namespace GraduationProjectBackendAPI.Models.Courses
         public string SectionName { get; set; }
         public int SectionOrder { get; set; }
 
+        public bool IsDeleted { get; set; } = false; // Soft Delete Flag
         public bool IsVisible { get; set; } = true;
         public bool RequiresPreviousSectionCompletion { get; set; } = false;
 
         // Navigation Properties
-        public virtual Level Level { get; set; }
+        public virtual Level? Level { get; set; }
         public ICollection<Content>? Contents { get; set; }
-        public virtual Quiz Quiz { get; set; }
-        public virtual TaskT Task { get; set; }
+        public virtual Quiz? Quiz { get; set; }
+        public virtual TaskT? Task { get; set; }
     }
 }

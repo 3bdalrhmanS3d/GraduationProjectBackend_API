@@ -34,7 +34,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return Ok(new { message = "Welcome to Instructor Dashboard!" });
         }
 
-        // Track
+        // Track 
         // course 
         // level
         // section
@@ -77,7 +77,9 @@ namespace GraduationProjectBackendAPI.Controllers.User
                     }
                 }
 
+
                 await _context.SaveChangesAsync();
+                TrackInstructorActions( "Create", $"Track created successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             }
 
             return Ok(new { message = "Track created successfully", trackId = track.TrackId });
@@ -97,6 +99,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Update", $"Track updated successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Track updated successfully", track });
         }
 
@@ -113,6 +116,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _context.CourseTrackCourses.Remove(entry);
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Remove", $"Course removed from track successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Course removed from track." });
         }
 
@@ -131,6 +135,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _context.CourseTracks.Remove(track);
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Delete", $"Track deleted successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Track deleted successfully." });
         }
 
@@ -159,6 +164,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Add", $"Course added to track successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Course added to track." });
         }
 
@@ -171,9 +177,9 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return Unauthorized();
 
             var tracks = await _context.CourseTracks
-                .Include(t => t.CourseTrackCourses)
+                .Include(t => t.CourseTrackCourses)!
                 .ThenInclude(ctc => ctc.Courses)
-                .Where(t => t.CourseTrackCourses.Any(c => c.Courses.InstructorId == instructorId))
+                .Where(t => t.CourseTrackCourses!.Any(c => c.Courses.InstructorId == instructorId))
                 .ToListAsync();
 
             var result = tracks.Select(track => new
@@ -182,13 +188,16 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 track.TrackName,
                 track.TrackDescription,
                 track.CreatedAt,
-                Courses = track.CourseTrackCourses.Select(c => new
+                Courses = track.CourseTrackCourses!.Select(c => new
                 {
                     c.CourseId,
                     c.Courses.CourseName,
                     c.Courses.CourseImage
                 })
             });
+
+            if (result == null || !result.Any())
+                return NotFound(new { message = "No tracks found." });
 
             return Ok(result);
         }
@@ -202,9 +211,9 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return Unauthorized();
 
             var track = await _context.CourseTracks
-                .Include(t => t.CourseTrackCourses)
+                .Include(t => t.CourseTrackCourses)!
                 .ThenInclude(ctc => ctc.Courses)
-                .FirstOrDefaultAsync(t => t.TrackId == trackId && t.CourseTrackCourses.Any(c => c.Courses.InstructorId == instructorId));
+                .FirstOrDefaultAsync(t => t.TrackId == trackId && t.CourseTrackCourses!.Any(c => c.Courses.InstructorId == instructorId));
             
             if (track == null)
                 return NotFound(new { message = "Track not found or not yours." });
@@ -214,13 +223,16 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 track.TrackName,
                 track.TrackDescription,
                 track.CreatedAt,
-                Courses = track.CourseTrackCourses.Select(c => new
+                Courses = track.CourseTrackCourses!.Select(c => new
                 {
                     c.CourseId,
                     c.Courses.CourseName,
                     c.Courses.CourseImage
                 })
             };
+            if (result == null || !result.Courses.Any())
+                return NotFound(new { message = "No courses found in this track." });
+
             return Ok(result);
         }
 
@@ -235,7 +247,6 @@ namespace GraduationProjectBackendAPI.Controllers.User
             var instructorId = GetUserIdFromToken();
             if (instructorId == null)
                 return Unauthorized(new { message = "Invalid or missing token." });
-
 
             var user = await _context.UsersT.FindAsync(instructorId);
             if (user == null)
@@ -346,6 +357,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 await _context.SaveChangesAsync();
             }
 
+            TrackInstructorActions("Create", $"Course created successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Course created successfully!", course = newCourse });
 
         }
@@ -449,6 +461,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Update", $"Course updated successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Course updated successfully!", course });
         }
 
@@ -468,6 +481,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             course.IsDeleted = true;
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Delete", $"Course soft-deleted successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Course soft-deleted successfully." });
         }
 
@@ -490,6 +504,8 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             course.IsActive = !course.IsActive;
             await _context.SaveChangesAsync();
+
+            TrackInstructorActions("Toggle", $"Course status toggled successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
 
             return Ok(new
             {
@@ -569,6 +585,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _context.Levels.Add(level);
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Create", $"Level created successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Level created successfully!", level });
         }
         
@@ -593,6 +610,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 level.LevelDetails = input.LevelDetails.Trim();
 
             await _context.SaveChangesAsync();
+            TrackInstructorActions("Update", $"Level updated successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Level updated successfully!", level });
         }
 
@@ -610,9 +628,11 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (level == null)
                 return NotFound(new { message = "Level not found or not yours." });
 
-            _context.Levels.Remove(level);
+
+            level.IsDeleted = true;
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Delete", $"Level deleted successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Level deleted successfully." });
         }
 
@@ -652,6 +672,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             level.IsVisible = !level.IsVisible;
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Toggle", $"Level visibility toggled successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new
             {
                 message = level.IsVisible ? "Level is now visible." : "Level is now hidden.",
@@ -679,6 +700,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
 
             await _context.SaveChangesAsync();
+            TrackInstructorActions("Reorder", $"Levels reordered successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Levels reordered successfully." });
         }
 
@@ -744,7 +766,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             _context.Sections.Add(section);
             await _context.SaveChangesAsync();
-
+            TrackInstructorActions("Create", $"Section created successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Section created successfully!", section });
         }
 
@@ -767,6 +789,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 section.SectionName = input.SectionName.Trim();
 
             await _context.SaveChangesAsync();
+            TrackInstructorActions("Update", $"Section updated successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Section updated successfully!", section });
         }
 
@@ -785,9 +808,10 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (section == null)
                 return NotFound(new { message = "Section not found or not yours." });
 
-            _context.Sections.Remove(section);
+            section.IsDeleted = true;
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Delete", $"Section deleted successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Section deleted successfully." });
         }
 
@@ -812,6 +836,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
 
             await _context.SaveChangesAsync();
+            TrackInstructorActions("Reorder", $"Sections reordered successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Sections reordered successfully." });
         }
 
@@ -833,6 +858,8 @@ namespace GraduationProjectBackendAPI.Controllers.User
             section.IsVisible = !section.IsVisible;
             await _context.SaveChangesAsync();
 
+
+            TrackInstructorActions("Toggle", $"Section visibility toggled successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new
             {
                 message = section.IsVisible ? "Section is now visible." : "Section is now hidden.",
@@ -913,7 +940,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             _context.Contents.Add(content);
             await _context.SaveChangesAsync();
-
+            TrackInstructorActions("Create", $"Content created successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Content created successfully.", content });
         }
 
@@ -984,6 +1011,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
 
             await _context.SaveChangesAsync();
+            TrackInstructorActions("Update", $"Content updated successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Content updated successfully.", content });
         }
 
@@ -1007,6 +1035,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _context.Contents.Remove(content);
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Delete", $"Content deleted successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Content deleted successfully." });
         }
 
@@ -1032,6 +1061,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
 
             await _context.SaveChangesAsync();
+            TrackInstructorActions("Reorder", $"Contents reordered successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Content reordered successfully." });
         }
 
@@ -1054,6 +1084,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             content.IsVisible = !content.IsVisible;
             await _context.SaveChangesAsync();
 
+            TrackInstructorActions("Toggle", $"Content visibility toggled successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new
             {
                 message = content.IsVisible ? "Content is now visible." : "Content is now hidden.",
@@ -1071,6 +1102,36 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return null;
 
             return userId;
+        }
+
+        private string? GetUserNameFromToken()
+        {
+            return User.FindFirst(ClaimTypes.Name)?.Value;
+        }
+
+        private string? GetUserRoleFromToken()
+        {
+            return User.FindFirst(ClaimTypes.Role)?.Value;
+        }
+
+        private void TrackInstructorActions(string actionType, string description)
+        {
+            var userId = GetUserIdFromToken();
+                   
+            if(userId == null)
+                return ;
+
+            var log = new InstructorActionLog
+            {
+                InstructorId = userId.Value,
+                
+                ActionType = actionType,
+                ActionDescription = description,
+                ActionDate = DateTime.UtcNow
+            };
+
+            _context.InstructorActionLogs.Add(log);
+            _context.SaveChanges();
         }
 
         // Format the skill text

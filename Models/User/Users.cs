@@ -58,5 +58,7 @@ namespace GraduationProjectBackendAPI.Models.User
         public virtual ICollection<CourseFeedback>? Feedbacks { get; set; }
         public ICollection<FavoriteCourse>? FavoriteCourses { get; set; }
         public virtual ICollection<Notification> Notifications { get; set; }
+
+        public virtual ICollection<InstructorActionLog>? InstructorActions { get; set; }
     }
 }

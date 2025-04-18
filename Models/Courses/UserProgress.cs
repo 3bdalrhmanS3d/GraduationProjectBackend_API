@@ -21,13 +21,16 @@ namespace GraduationProjectBackendAPI.Models.Courses
         [ForeignKey("Section")]
         public int CurrentSectionId { get; set; } // رابط مباشر للـ Section
 
+        [ForeignKey("Content")]
+        public int? CurrentContentId { get; set; }
         public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
 
         // Navigation
-        public virtual Users User { get; set; }
-        public virtual Courses Course { get; set; }
-        public virtual Level CurrentLevel { get; set; }
-        public virtual Section CurrentSection { get; set; }
+        public virtual Users? User { get; set; }
+        public virtual Courses? Course { get; set; }
+        public virtual Level? CurrentLevel { get; set; }
+        public virtual Section? CurrentSection { get; set; }
+        public virtual Content? CurrentContent { get; set; }
     }
 
 }
