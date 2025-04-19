@@ -1,12 +1,11 @@
-﻿using GraduationProjectBackendAPI.Models;
+﻿using GraduationProjectBackendAPI.Controllers.DOT.User;
+using GraduationProjectBackendAPI.Models;
 using GraduationProjectBackendAPI.Models.AppDBContext;
 using GraduationProjectBackendAPI.Models.Courses;
-using GraduationProjectBackendAPI.Models.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using GraduationProjectBackendAPI.Controllers.DOT.User;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
@@ -31,7 +30,8 @@ namespace GraduationProjectBackendAPI.Controllers.User
         public async Task<IActionResult> UpdateUserProfile([FromBody] UserProfileUpdateModel model)
         {
             var userId = GetUserIdFromToken();
-            if (userId == null) {
+            if (userId == null)
+            {
                 return Unauthorized(new { message = "Invalid or missing token." });
             }
 
@@ -196,7 +196,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                       enrollment => new { enrollment.UserId, enrollment.CourseId },
                       payment => new { payment.UserId, payment.CourseId },
                       (enrollment, payment) => new { enrollment, payment })
-                .Where(joined => joined.payment.Status == PaymentStatus.Completed) 
+                .Where(joined => joined.payment.Status == PaymentStatus.Completed)
                 .Select(joined => new
                 {
                     joined.enrollment.Course.CourseId,
@@ -221,7 +221,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return Unauthorized(new { message = "Invalid or missing token." });
 
             var favoriteCourses = await _context.FavoriteCourses
-                    .Where(f => f.UserId == userId.Value)  
+                    .Where(f => f.UserId == userId.Value)
                     .Include(f => f.Course)
                     .ToListAsync();
 
@@ -241,23 +241,23 @@ namespace GraduationProjectBackendAPI.Controllers.User
         }
 
         [HttpPost("upload-profile-photo")]
-        public async Task<IActionResult> UploadProfilePhoto( IFormFile file)
+        public async Task<IActionResult> UploadProfilePhoto(IFormFile file)
         {
             var userId = GetUserIdFromToken();
-            if( userId == null)
+            if (userId == null)
                 return Unauthorized(new { message = "Invalid or missing token." });
 
             var user = await _context.UsersT.FindAsync(userId);
             if (user == null)
                 return NotFound(new { message = "User not found." });
 
-            if(file == null || file.Length == 0)
+            if (file == null || file.Length == 0)
                 return BadRequest(new { message = "No file uploaded." });
 
             var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads/profile-pictures");
             if (!Directory.Exists(uploadsFolder))
                 Directory.CreateDirectory(uploadsFolder);
-            
+
             // Generate Unique File Name
             var fileExtension = Path.GetExtension(file.FileName);
             var fileName = $"user_{userId}{fileExtension}";
@@ -478,7 +478,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 .Include(l => l.Course)
                 .FirstOrDefaultAsync(l => l.LevelId == levelId && !l.IsDeleted);
 
-            if (level == null )
+            if (level == null)
                 return NotFound(new { message = "Level not found." });
 
             // Ensure user is enrolled in the same course
@@ -523,7 +523,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
         public async Task<IActionResult> GetSectionContents(int sectionId)
         {
             var userId = GetUserIdFromToken();
-            if (userId == null) 
+            if (userId == null)
                 return Unauthorized();
 
             var section = await _context.Sections
@@ -624,7 +624,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             return userId;
         }
-        
+
     }
-    
+
 }

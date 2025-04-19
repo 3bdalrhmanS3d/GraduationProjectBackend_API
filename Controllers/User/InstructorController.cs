@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
@@ -52,39 +51,85 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (instructorId == null)
                 return Unauthorized();
 
-            var track = new CourseTrack
+            
+            if (!ModelState.IsValid)
             {
-                TrackName = input.TrackName.Trim(),
-                TrackDescription = input.TrackDescription?.Trim(),
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.CourseTracks.Add(track);
-            await _context.SaveChangesAsync();
-
-            if (input.CourseIds != null && input.CourseIds.Any())
-            {
-                foreach (var courseId in input.CourseIds)
+                var track = new CourseTrack
                 {
-                    var course = await _context.Courses.FirstOrDefaultAsync(c => c.CourseId == courseId && c.InstructorId == instructorId);
-                    if (course != null)
+                    TrackName = input.TrackName.Trim(),
+                    TrackImage = input.TrackImage ?? "/uploads/TrackImages/default.png",
+                    TrackDescription = input.TrackDescription?.Trim(),
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.CourseTracks.Add(track);
+                await _context.SaveChangesAsync();
+
+
+                if (input.CourseIds != null && input.CourseIds.Any())
+                {
+                    foreach (var courseId in input.CourseIds)
                     {
-                        _context.CourseTrackCourses.Add(new CourseTrackCourse
+                        var course = await _context.Courses.FirstOrDefaultAsync(c => c.CourseId == courseId && c.InstructorId == instructorId);
+                        if (course != null)
                         {
-                            TrackId = track.TrackId,
-                            CourseId = course.CourseId
-                        });
+                            _context.CourseTrackCourses.Add(new CourseTrackCourse
+                            {
+                                TrackId = track.TrackId,
+                                CourseId = course.CourseId
+                            });
+                        }
                     }
+
+                    await _context.SaveChangesAsync();
+                    TrackInstructorActions("Create", $"Track created successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
                 }
 
-
-                await _context.SaveChangesAsync();
-                TrackInstructorActions( "Create", $"Track created successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
+                return Ok(new { message = "Track created successfully", trackId = track.TrackId });
+            }
+            else
+            {
+                return BadRequest(new { message = "Invalid input data.", ModelState });
             }
 
-            return Ok(new { message = "Track created successfully", trackId = track.TrackId });
+            
         }
 
+        // add track image
+        [HttpPost("upload-track-image/{trackId}")]
+        public async Task<IActionResult> UploadTrackImage(int trackId, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file uploaded." });
+
+            var track = await _context.CourseTracks.FindAsync(trackId);
+            if (track == null)
+                return NotFound(new { message = "Track not found." });
+
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads/TrackImages");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var extension = Path.GetExtension(file.FileName);
+            var fileName = $"track_{trackId}_{Guid.NewGuid()}{extension}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var relativePath = $"/uploads/TrackImages/{fileName}";
+            track.TrackImage = relativePath;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Track image uploaded and linked successfully.",
+                imageUrl = relativePath
+            });
+        }
 
         // update track
         [HttpPut("update-track/{trackId}")]
@@ -131,7 +176,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (track == null)
                 return NotFound(new { message = "Track not found." });
 
-            _context.CourseTrackCourses.RemoveRange(track.CourseTrackCourses);
+            _context.CourseTrackCourses.RemoveRange(track.CourseTrackCourses!);
             _context.CourseTracks.Remove(track);
             await _context.SaveChangesAsync();
 
@@ -214,7 +259,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 .Include(t => t.CourseTrackCourses)!
                 .ThenInclude(ctc => ctc.Courses)
                 .FirstOrDefaultAsync(t => t.TrackId == trackId && t.CourseTrackCourses!.Any(c => c.Courses.InstructorId == instructorId));
-            
+
             if (track == null)
                 return NotFound(new { message = "Track not found or not yours." });
             var result = new
@@ -302,9 +347,9 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (instructorId == null)
                 return Unauthorized(new { message = "Invalid or missing token." });
 
-            if(!ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
-                return BadRequest(new { message = "Invalid input data." , ModelState });
+                return BadRequest(new { message = "Invalid input data.", ModelState });
             }
 
             if (input.CoursePrice < 0)
@@ -338,7 +383,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                     };
                     _context.aboutCourses.Add(aboutCourse);
                 }
-                
+
             }
             // Add course skills
             if (input.CourseSkills != null && input.CourseSkills.Any())
@@ -550,7 +595,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             return Ok(new { message = "Course image uploaded successfully.", course.CourseImage });
         }
 
-        
+
         #endregion
 
         #region Level
@@ -567,7 +612,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return NotFound(new { message = "Course not found or not owned by you." });
 
             int nextOrder = await _context.Levels.Where(l => l.CourseId == input.CourseId).CountAsync() + 1;
-            
+
             // if it's the first level, no need to require previous level completion
             bool requiresPrevious = nextOrder == 1 ? false : true;
 
@@ -588,7 +633,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             TrackInstructorActions("Create", $"Level created successfully by {GetUserNameFromToken()} his role is {GetUserRoleFromToken()}");
             return Ok(new { message = "Level created successfully!", level });
         }
-        
+
         // update level
         [HttpPut("update-level")]
         public async Task<IActionResult> UpdateLevel([FromBody] UpdateLevelInput input)
@@ -759,7 +804,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 LevelId = input.LevelId,
                 SectionName = input.SectionName.Trim(),
                 SectionOrder = nextOrder,
-                
+
                 RequiresPreviousSectionCompletion = requiresPrevious
 
             };
@@ -1094,7 +1139,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
 
         #endregion
-        
+
         private int? GetUserIdFromToken()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -1117,14 +1162,14 @@ namespace GraduationProjectBackendAPI.Controllers.User
         private void TrackInstructorActions(string actionType, string description)
         {
             var userId = GetUserIdFromToken();
-                   
-            if(userId == null)
-                return ;
+
+            if (userId == null)
+                return;
 
             var log = new InstructorActionLog
             {
                 InstructorId = userId.Value,
-                
+
                 ActionType = actionType,
                 ActionDescription = description,
                 ActionDate = DateTime.UtcNow

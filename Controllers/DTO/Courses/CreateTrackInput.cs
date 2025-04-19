@@ -9,6 +9,8 @@ namespace GraduationProjectBackendAPI.Controllers.DOT.Courses
 
         public string? TrackDescription { get; set; }
 
+        public string? TrackImage { get; set; }
+
         public List<int>? CourseIds { get; set; }
     }
 }
