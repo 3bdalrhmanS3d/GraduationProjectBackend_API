@@ -38,6 +38,7 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
 
         public DbSet<Notification> NotificationT { get; set; }
         public DbSet<InstructorActionLog> InstructorActionLogs { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
         // Courses Platform Tables
         public DbSet<Courses.Courses> Courses { get; set; }
         public DbSet<Level> Levels { get; set; }
@@ -57,6 +58,7 @@ namespace GraduationProjectBackendAPI.Models.AppDBContext
         public DbSet<FavoriteCourse> FavoriteCourses { get; set; }
         public DbSet<CourseTrack> CourseTracks { get; set; }
         public DbSet<CourseTrackCourse> CourseTrackCourses { get; set; }
+        public DbSet<UserContentActivity> UserContentActivities { get; set; }
 
         // DbSets for the existing models
 

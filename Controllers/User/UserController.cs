@@ -2,6 +2,7 @@
 using GraduationProjectBackendAPI.Models;
 using GraduationProjectBackendAPI.Models.AppDBContext;
 using GraduationProjectBackendAPI.Models.Courses;
+using GraduationProjectBackendAPI.Models.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -346,10 +347,10 @@ namespace GraduationProjectBackendAPI.Controllers.User
         public async Task<IActionResult> GetCoursesInTrack(int trackId)
         {
             var track = await _context.CourseTracks
-                .Include(t => t.CourseTrackCourses)
+                .Include(t => t.CourseTrackCourses)!
                     .ThenInclude(ctc => ctc.Courses)
                         .ThenInclude(c => c.User)
-                .Include(t => t.CourseTrackCourses)
+                .Include(t => t.CourseTrackCourses)!
                     .ThenInclude(ctc => ctc.Courses)
                         .ThenInclude(c => c.Levels)
                 .FirstOrDefaultAsync(t => t.TrackId == trackId);
@@ -357,7 +358,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (track == null)
                 return NotFound(new { message = "Track not found." });
 
-            var courses = track.CourseTrackCourses
+            var courses = track.CourseTrackCourses!
                 .Where(ctc => !ctc.Courses.IsDeleted && ctc.Courses.IsActive)
                 .Select(ctc => new
                 {
@@ -536,7 +537,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return NotFound(new { message = "Section not found or not accessible." });
 
             var enrolled = await _context.CourseEnrollments
-                .AnyAsync(e => e.UserId == userId && e.CourseId == section.Level.CourseId);
+                .AnyAsync(e => e.UserId == userId && e.CourseId == section.Level!.CourseId);
 
             if (!enrolled)
                 return Forbid("You are not enrolled in this course.");
@@ -564,6 +565,55 @@ namespace GraduationProjectBackendAPI.Controllers.User
             });
         }
 
+        // Record the start/end time of each Content to help track the actual study.
+        [HttpPost("start-content/{contentId}")]
+        public async Task<IActionResult> StartContent(int contentId)
+        {
+            var userId = GetUserIdFromToken();
+            if(userId == null)
+                return Unauthorized();
+
+            var exists = await _context.UserContentActivities
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.ContentId == contentId && a.EndTime == null);
+
+            if (exists != null)
+                return BadRequest(new { message = "Already started this content." });
+
+            var activity = new UserContentActivity
+            {
+                UserId = userId.Value,
+                ContentId = contentId,
+                StartTime = DateTime.UtcNow
+            };
+
+            _context.UserContentActivities.Add(activity);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Content started." });
+
+        }
+
+        [HttpPost("end-content/{contentId}")]
+        public async Task<IActionResult> EndContent(int contentId)
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null) return Unauthorized();
+
+            var activity = await _context.UserContentActivities
+                .FirstOrDefaultAsync(a => a.UserId == userId && a.ContentId == contentId && a.EndTime == null);
+
+            if (activity == null)
+                return NotFound(new { message = "No active session found for this content." });
+
+            activity.EndTime = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Content ended." });
+        }
+
+
+
+
         [HttpPost("complete-section/{currentSectionId}")]
         public async Task<IActionResult> CompleteSection(int currentSectionId)
         {
@@ -586,14 +636,14 @@ namespace GraduationProjectBackendAPI.Controllers.User
             var nextSection = currentIndex + 1 < allSections.Count ? allSections[currentIndex + 1] : null;
 
             var userProgress = await _context.UserProgresses
-                .FirstOrDefaultAsync(p => p.UserId == userId && p.CourseId == currentSection.Level.CourseId);
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.CourseId == currentSection.Level!.CourseId);
 
             if (userProgress == null)
             {
                 userProgress = new UserProgress
                 {
                     UserId = userId.Value,
-                    CourseId = currentSection.Level.CourseId,
+                    CourseId = currentSection.Level!.CourseId,
                     CurrentLevelId = currentSection.LevelId,
                     CurrentSectionId = nextSection?.SectionId ?? currentSectionId,
                     LastUpdated = DateTime.UtcNow
@@ -616,11 +666,131 @@ namespace GraduationProjectBackendAPI.Controllers.User
             });
         }
 
+        [HttpGet("next-section/{courseId}")]
+        public async Task<IActionResult> GetNextSection(int courseId)
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null) return Unauthorized();
+
+            var progress = await _context.UserProgresses
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.CourseId == courseId);
+
+            if (progress == null)
+                return NotFound(new { message = "No progress found." });
+
+            var currentSection = await _context.Sections
+                .FirstOrDefaultAsync(s => s.SectionId == progress.CurrentSectionId);
+
+            if (currentSection == null)
+                return NotFound(new { message = "Current section not found." });
+
+            var nextSection = await _context.Sections
+                .Where(s => s.LevelId == currentSection.LevelId && s.SectionOrder > currentSection.SectionOrder)
+                .OrderBy(s => s.SectionOrder)
+                .FirstOrDefaultAsync();
+
+            if (nextSection != null)
+                return Ok(new { nextSection.SectionId, nextSection.SectionName });
+
+            var nextLevel = await _context.Levels
+                .Where(l => l.CourseId == courseId && l.LevelOrder > currentSection.Level!.LevelOrder)
+                .OrderBy(l => l.LevelOrder)
+                .FirstOrDefaultAsync();
+
+            if (nextLevel != null)
+            {
+                var firstSection = await _context.Sections
+                    .Where(s => s.LevelId == nextLevel.LevelId)
+                    .OrderBy(s => s.SectionOrder)
+                    .FirstOrDefaultAsync();
+
+                if (firstSection != null)
+                    return Ok(new { nextSection = firstSection.SectionId, firstSection.SectionName });
+            }
+
+            return Ok(new { message = "You finished the course 🎉" });
+        }
+
+        [HttpGet("User-stats")]
+        public async Task<IActionResult> GetUserStats()
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null) return Unauthorized();
+
+            var enrolledCourses = await _context.CourseEnrollments
+                .Where(e => e.UserId == userId)
+                .Select(e => e.CourseId)
+                .ToListAsync();
+
+            var completedSections = await _context.UserContentActivities
+                .Where(a => a.UserId == userId && a.EndTime != null)
+                .Select(a => a.Content.SectionId)
+                .Distinct()
+                .CountAsync();
+
+            var allProgress = await _context.UserProgresses
+                .Where(p => p.UserId == userId)
+                .ToListAsync();
+
+            var courseProgress = allProgress.Select(async p =>
+            {
+                var totalSections = await _context.Sections
+                    .Where(s => s.Level!.CourseId == p.CourseId && !s.IsDeleted && s.IsVisible)
+                    .CountAsync();
+
+                var currentSectionOrder = await _context.Sections
+                    .Where(s => s.SectionId == p.CurrentSectionId)
+                    .Select(s => s.SectionOrder)
+                    .FirstOrDefaultAsync();
+
+                return new
+                {
+                    p.CourseId,
+                    ProgressPercentage = totalSections > 0 ? (int)((double)currentSectionOrder / totalSections * 100) : 0
+                };
+            });
+
+            return Ok(new
+            {
+                SharedCourses = enrolledCourses.Count,
+                CompletedSections = completedSections,
+                Progress = await Task.WhenAll(courseProgress)
+            });
+        }
+
+        [HttpGet("course-completion/{courseId}")]
+        public async Task<IActionResult> HasCompletedCourse(int courseId)
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null) return Unauthorized();
+
+            var totalSections = await _context.Sections
+                .Where(s => s.Level!.CourseId == courseId && !s.IsDeleted && s.IsVisible)
+                .CountAsync();
+
+            var completedSectionIds = await _context.UserContentActivities
+                .Where(a => a.UserId == userId && a.EndTime != null && a.Content.Section.Level!.CourseId == courseId)
+                .Select(a => a.Content.SectionId)
+                .Distinct()
+                .ToListAsync();
+
+            var completedCount = completedSectionIds.Count;
+
+            return Ok(new
+            {
+                totalSections,
+                completedSections = completedCount,
+                isCompleted = completedCount == totalSections
+            });
+        }
+
         private int? GetUserIdFromToken()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
                 return null;
+
+
 
             return userId;
         }

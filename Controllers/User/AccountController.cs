@@ -322,11 +322,22 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 tokenDuration
             );
 
+            var refreshToken = new RefreshToken
+            {
+                Token = Guid.NewGuid().ToString(),
+                ExpiryDate = DateTime.UtcNow.AddDays(7),
+                UserId = existingUser.UserId
+            };
+            _context.RefreshTokens.Add(refreshToken);
+            await _context.SaveChangesAsync();
+
+
             var userResponse = new
             {
                 token = new JwtSecurityTokenHandler().WriteToken(mytoken),
                 expired = mytoken.ValidTo,
-                role = existingUser.Role.ToString() // User role
+                role = existingUser.Role.ToString(), // User role
+                refreshToken = refreshToken.Token
             };
 
             // remmeber me 
@@ -345,6 +356,45 @@ namespace GraduationProjectBackendAPI.Controllers.User
             }
 
             return Ok(userResponse);
+        }
+
+        [HttpPost("refresh-token")]
+        public async Task<IActionResult> RefreshToken([FromBody] string oldRefreshToken)
+        {
+            var refreshToken = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .FirstOrDefaultAsync(rt => rt.Token == oldRefreshToken && !rt.IsRevoked);
+
+            if (refreshToken == null || refreshToken.ExpiryDate < DateTime.UtcNow)
+                return Unauthorized(new { message = "Invalid or expired refresh token." });
+
+            //Old Token Heroes
+            refreshToken.IsRevoked = true;
+
+            var newAccessToken = GenerateAccessToken(
+                refreshToken.User.UserId.ToString(),
+                refreshToken.User.EmailAddress,
+                refreshToken.User.FullName,
+                refreshToken.User.Role
+            );
+
+            //Create a new RefreshToken
+            var newRefreshToken = new RefreshToken
+            {
+                Token = Guid.NewGuid().ToString(),
+                ExpiryDate = DateTime.UtcNow.AddDays(7),
+                UserId = refreshToken.User.UserId
+            };
+
+            _context.RefreshTokens.Add(newRefreshToken);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                token = new JwtSecurityTokenHandler().WriteToken(newAccessToken),
+                expired = newAccessToken.ValidTo,
+                refreshToken = newRefreshToken.Token
+            });
         }
 
         [HttpGet("auto-login")]

@@ -40,6 +40,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
         // content
         // quiz
         // task
+        // dashboard
 
         #region Track
 
@@ -1140,6 +1141,56 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
         #endregion
 
+        #region DashBoard
+        [HttpGet("dashboard-course-stats")]
+        public async Task<IActionResult> GetCourseStates()
+        {
+            var userId = GetUserIdFromToken();
+            var role = GetUserRoleFromToken();
+
+            if(userId == null)
+                return Unauthorized(new { message = "Invalid or missing token." });
+
+            if (role == null) 
+                return Forbid("You are not authorized to view this data.");
+
+            var course = await _context.Courses
+                .Where(c => !c.IsDeleted && c.InstructorId == userId)
+                .ToListAsync();
+
+            var courseStats = await Task.WhenAll(course.Select(async course =>
+            {
+                var studentCount = await _context.CourseEnrollments.CountAsync(e => e.CourseId == course.CourseId);
+                var progressCount = await _context.UserProgresses.CountAsync(p => p.CourseId == course.CourseId);
+
+                return new
+                {
+                    course.CourseId,
+                    course.CourseName,
+                    course.CourseImage,
+                    StudentCount = studentCount,
+                    ProgressCount = progressCount
+                };
+            }));
+
+            var mostEngagedCourse = courseStats.OrderByDescending(c => c.ProgressCount).FirstOrDefault();
+
+            return Ok(new
+            {
+                TotalCourses = courseStats.Length,
+                Courses = courseStats,
+                MostEngagedCourse = mostEngagedCourse != null
+                    ? new
+                    {
+                        mostEngagedCourse.CourseId,
+                        mostEngagedCourse.CourseName,
+                        mostEngagedCourse.ProgressCount
+                    }
+                    : null
+            });
+        }
+
+        #endregion
         private int? GetUserIdFromToken()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
