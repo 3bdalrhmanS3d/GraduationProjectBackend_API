@@ -1,15 +1,18 @@
 ﻿using GraduationProjectBackendAPI.Controllers.User;
+using GraduationProjectBackendAPI.Models;
 using GraduationProjectBackendAPI.Models.AppDBContext;
+using GraduationProjectBackendAPI.Models.User;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace GraduationProjectBackendAPI
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -91,8 +94,9 @@ namespace GraduationProjectBackendAPI
             builder.Services.AddHostedService<EmailQueueBackgroundService>();
 
             builder.Services.AddEndpointsApiExplorer();
-
+  
             var app = builder.Build();
+            await SeedAdminUserAsync(app.Services);
 
             if (app.Environment.IsDevelopment())
             {
@@ -109,6 +113,54 @@ namespace GraduationProjectBackendAPI
             app.MapControllers();
 
             app.Run();
+        }
+
+
+        private static async Task SeedAdminUserAsync(IServiceProvider serviceProvider)
+        {
+            using var scope = serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            if (!await context.UsersT.AnyAsync(u => u.Role == UserRole.Admin))
+            {
+                var adminUser = new Users
+                {
+                    FullName = "Super Admin",
+                    EmailAddress = "admin@platform.com",
+                    PasswordHash = HashPassword("Admin@1234"),
+                    CreatedAt = DateTime.UtcNow,
+                    Role = UserRole.Admin,
+                    ProfilePhoto = "/uploads/profile-pictures/defult_user.webp",
+                    IsSystemProtected = true
+                };
+
+                context.UsersT.Add(adminUser);
+                await context.SaveChangesAsync();
+
+                var adminVerification = new AccountVerification
+                {
+                    UserId = adminUser.UserId,
+                    Code = "000000",
+                    CheckedOK = true,
+                    Date = DateTime.UtcNow
+                };
+
+                context.AccountVerificationT.Add(adminVerification);
+                await context.SaveChangesAsync();
+            }
+        }
+
+
+        private static string HashPassword(string password)
+        {
+            byte[] salt = new byte[16];
+
+            RandomNumberGenerator.Fill(salt);
+
+            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 10000, HashAlgorithmName.SHA256);
+            byte[] hash = pbkdf2.GetBytes(32);
+
+            return Convert.ToBase64String(salt) + ":" + Convert.ToBase64String(hash);
         }
     }
 }

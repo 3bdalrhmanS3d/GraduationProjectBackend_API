@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GraduationProjectBackendAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250203150547_init4")]
-    partial class init4
+    [Migration("20250426170646_InitClean")]
+    partial class InitClean
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -23,6 +23,29 @@ namespace GraduationProjectBackendAPI.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder, 1L, 1);
+
+            modelBuilder.Entity("CourseTrackCourse", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1L, 1);
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TrackId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.HasIndex("TrackId");
+
+                    b.ToTable("CourseTrackCourses");
+                });
 
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.AccountVerification", b =>
                 {
@@ -84,8 +107,14 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ContentId"), 1L, 1);
 
+                    b.Property<string>("ContentDescription")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ContentDoc")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ContentOrder")
+                        .HasColumnType("int");
 
                     b.Property<string>("ContentText")
                         .HasColumnType("nvarchar(max)");
@@ -96,11 +125,21 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Property<string>("ContentUrl")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("DurationInMinutes")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("bit");
+
                     b.Property<int>("SectionId")
                         .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("ContentId");
 
@@ -232,9 +271,15 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CourseId"), 1L, 1);
 
+                    b.Property<string>("CourseImage")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("CourseName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("CoursePrice")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -245,6 +290,12 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     b.Property<int>("InstructorId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
 
                     b.HasKey("CourseId");
 
@@ -275,6 +326,58 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.ToTable("courseSkills");
                 });
 
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.CourseTrack", b =>
+                {
+                    b.Property<int>("TrackId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TrackId"), 1L, 1);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TrackDescription")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TrackImage")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TrackName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("TrackId");
+
+                    b.ToTable("CourseTracks");
+                });
+
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.FavoriteCourse", b =>
+                {
+                    b.Property<int>("FavoriteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FavoriteId"), 1L, 1);
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("FavoriteId");
+
+                    b.HasIndex("CourseId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("FavoriteCourses");
+                });
+
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.Level", b =>
                 {
                     b.Property<int>("LevelId")
@@ -286,6 +389,12 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Property<int>("CourseId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("bit");
+
                     b.Property<string>("LevelDetails")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -296,6 +405,9 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     b.Property<int>("LevelOrder")
                         .HasColumnType("int");
+
+                    b.Property<bool>("RequiresPreviousLevelCompletion")
+                        .HasColumnType("bit");
 
                     b.HasKey("LevelId");
 
@@ -424,8 +536,17 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SectionId"), 1L, 1);
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("bit");
+
                     b.Property<int>("LevelId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("RequiresPreviousSectionCompletion")
+                        .HasColumnType("bit");
 
                     b.Property<string>("SectionName")
                         .IsRequired()
@@ -509,6 +630,35 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.ToTable("UserAnswers");
                 });
 
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.UserContentActivity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1L, 1);
+
+                    b.Property<int>("ContentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EndTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("StartTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserContentActivities");
+                });
+
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.UserCoursePoints", b =>
                 {
                     b.Property<int>("UserCoursePointsId")
@@ -546,6 +696,9 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Property<int>("CourseId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("CurrentContentId")
+                        .HasColumnType("int");
+
                     b.Property<int>("CurrentLevelId")
                         .HasColumnType("int");
 
@@ -561,6 +714,12 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.HasKey("UserProgressId");
 
                     b.HasIndex("CourseId");
+
+                    b.HasIndex("CurrentContentId");
+
+                    b.HasIndex("CurrentLevelId");
+
+                    b.HasIndex("CurrentSectionId");
 
                     b.HasIndex("UserId");
 
@@ -598,6 +757,40 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserTasks");
+                });
+
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.AdminActionLog", b =>
+                {
+                    b.Property<int>("LogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LogId"), 1L, 1);
+
+                    b.Property<DateTime>("ActionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ActionDetails")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("AdminId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TargetUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("LogId");
+
+                    b.HasIndex("AdminId");
+
+                    b.HasIndex("TargetUserId");
+
+                    b.ToTable("adminActionLogs");
                 });
 
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.AIChat", b =>
@@ -649,6 +842,91 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.ToTable("BlacklistTokensT");
                 });
 
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.InstructorActionLog", b =>
+                {
+                    b.Property<int>("LogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LogId"), 1L, 1);
+
+                    b.Property<DateTime>("ActionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ActionDescription")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("InstructorId")
+                        .HasColumnType("int");
+
+                    b.HasKey("LogId");
+
+                    b.HasIndex("InstructorId");
+
+                    b.ToTable("InstructorActionLogs");
+                });
+
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.Notification", b =>
+                {
+                    b.Property<int>("NotificationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("NotificationId"), 1L, 1);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("NotificationId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("NotificationT");
+                });
+
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.RefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1L, 1);
+
+                    b.Property<DateTime>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.UserLog", b =>
                 {
                     b.Property<int>("LogId")
@@ -693,19 +971,24 @@ namespace GraduationProjectBackendAPI.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("FirstName")
+                    b.Property<string>("FullName")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("LastName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<bool>("IsSystemProtected")
+                        .HasColumnType("bit");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ProfilePhoto")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
 
                     b.HasKey("UserId");
 
@@ -757,6 +1040,25 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("UserVisitHistoryT");
+                });
+
+            modelBuilder.Entity("CourseTrackCourse", b =>
+                {
+                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Courses", "Courses")
+                        .WithMany("CourseTrackCourses")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.CourseTrack", "CourseTrack")
+                        .WithMany("CourseTrackCourses")
+                        .HasForeignKey("TrackId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CourseTrack");
+
+                    b.Navigation("Courses");
                 });
 
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.AccountVerification", b =>
@@ -882,6 +1184,25 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Navigation("Courses");
                 });
 
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.FavoriteCourse", b =>
+                {
+                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Courses", "Course")
+                        .WithMany("FavoriteCourses")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
+                        .WithMany("FavoriteCourses")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Course");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.Level", b =>
                 {
                     b.HasOne("GraduationProjectBackendAPI.Models.Courses.Courses", "Course")
@@ -994,6 +1315,25 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.UserContentActivity", b =>
+                {
+                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Content", "Content")
+                        .WithMany()
+                        .HasForeignKey("ContentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Content");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.UserCoursePoints", b =>
                 {
                     b.HasOne("GraduationProjectBackendAPI.Models.Courses.Courses", "Course")
@@ -1021,6 +1361,22 @@ namespace GraduationProjectBackendAPI.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Content", "CurrentContent")
+                        .WithMany()
+                        .HasForeignKey("CurrentContentId");
+
+                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Level", "CurrentLevel")
+                        .WithMany()
+                        .HasForeignKey("CurrentLevelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GraduationProjectBackendAPI.Models.Courses.Section", "CurrentSection")
+                        .WithMany()
+                        .HasForeignKey("CurrentSectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
                         .WithMany("UserProgresses")
                         .HasForeignKey("UserId")
@@ -1028,6 +1384,12 @@ namespace GraduationProjectBackendAPI.Migrations
                         .IsRequired();
 
                     b.Navigation("Course");
+
+                    b.Navigation("CurrentContent");
+
+                    b.Navigation("CurrentLevel");
+
+                    b.Navigation("CurrentSection");
 
                     b.Navigation("User");
                 });
@@ -1051,10 +1413,62 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.AdminActionLog", b =>
+                {
+                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "Admin")
+                        .WithMany()
+                        .HasForeignKey("AdminId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "TargetUser")
+                        .WithMany()
+                        .HasForeignKey("TargetUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Admin");
+
+                    b.Navigation("TargetUser");
+                });
+
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.AIChat", b =>
                 {
                     b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
                         .WithMany("AIChats")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.InstructorActionLog", b =>
+                {
+                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
+                        .WithMany("InstructorActions")
+                        .HasForeignKey("InstructorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.Notification", b =>
+                {
+                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
+                        .WithMany("Notifications")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.User.RefreshToken", b =>
+                {
+                    b.HasOne("GraduationProjectBackendAPI.Models.User.Users", "User")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1103,6 +1517,10 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     b.Navigation("CourseSkills");
 
+                    b.Navigation("CourseTrackCourses");
+
+                    b.Navigation("FavoriteCourses");
+
                     b.Navigation("Feedbacks");
 
                     b.Navigation("Levels");
@@ -1114,6 +1532,11 @@ namespace GraduationProjectBackendAPI.Migrations
                     b.Navigation("aboutCourses");
 
                     b.Navigation("userCoursePoints");
+                });
+
+            modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.CourseTrack", b =>
+                {
+                    b.Navigation("CourseTrackCourses");
                 });
 
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.Level", b =>
@@ -1142,11 +1565,9 @@ namespace GraduationProjectBackendAPI.Migrations
                 {
                     b.Navigation("Contents");
 
-                    b.Navigation("Quiz")
-                        .IsRequired();
+                    b.Navigation("Quiz");
 
-                    b.Navigation("Task")
-                        .IsRequired();
+                    b.Navigation("Task");
                 });
 
             modelBuilder.Entity("GraduationProjectBackendAPI.Models.Courses.TaskT", b =>
@@ -1165,7 +1586,13 @@ namespace GraduationProjectBackendAPI.Migrations
 
                     b.Navigation("CourseReviews");
 
+                    b.Navigation("FavoriteCourses");
+
                     b.Navigation("Feedbacks");
+
+                    b.Navigation("InstructorActions");
+
+                    b.Navigation("Notifications");
 
                     b.Navigation("Payments");
 

@@ -136,6 +136,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 EmailAddress = userInput.EmailAddress,
                 PasswordHash = HashPassword(userInput.PasswordHash),
                 CreatedAt = DateTime.UtcNow,
+                IsSystemProtected = false,
                 Role = UserRole.RegularUser, 
                 ProfilePhoto = "/uploads/profile-pictures/defult_user.webp"
             };
