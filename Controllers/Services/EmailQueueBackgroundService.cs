@@ -1,4 +1,4 @@
-﻿namespace GraduationProjectBackendAPI.Controllers.User
+﻿namespace GraduationProjectBackendAPI.Controllers.Services
 {
     public class EmailQueueBackgroundService : BackgroundService
     {

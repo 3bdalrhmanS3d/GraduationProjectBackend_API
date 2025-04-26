@@ -43,7 +43,8 @@ namespace GraduationProjectBackendAPI.Models.User
         public string? ProfilePhoto { get; set; }
         public UserRole Role { get; set; } = UserRole.RegularUser;
         public bool IsSystemProtected { get; set; } = false;
-
+        public bool IsActive { get; set; } = true;
+        public bool IsDeleted { get; set; } = false;
         public UserDetails UserDetails { get; set; }
         public ICollection<UserVisitHistory>? UserVisitHistories { get; set; }
         public AccountVerification AccountVerification { get; set; }

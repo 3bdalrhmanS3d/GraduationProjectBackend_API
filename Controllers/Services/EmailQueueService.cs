@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using MailKit.Net.Smtp;
 
-namespace GraduationProjectBackendAPI.Controllers.User
+namespace GraduationProjectBackendAPI.Controllers.Services
 {
     public class EmailQueueService
     {
@@ -202,6 +202,70 @@ namespace GraduationProjectBackendAPI.Controllers.User
         }
 
 
+        public async Task SendCustomEmailAsync(string emailAddress, string fullName, string subject, string bodyMessage)
+        {
+            try
+            {
+                var smtpServer = _config["EmailSettings:SmtpServer"];
+                var port = Convert.ToInt32(_config["EmailSettings:Port"]);
+                var email = _config["EmailSettings:Email"];
+                var password = _config["EmailSettings:Password"];
+
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress("Graduation Project", email));
+                message.To.Add(new MailboxAddress(fullName, emailAddress));
+                message.Subject = subject;
+                message.Body = new TextPart("html") { Text = BuildCustomHtmlEmail(fullName, bodyMessage) };
+
+                using var client = new SmtpClient();
+                await client.ConnectAsync(smtpServer, port, SecureSocketOptions.StartTls);
+                await client.AuthenticateAsync(email, password);
+                await client.SendAsync(message);
+                await client.DisconnectAsync(true);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error sending email: {ex.Message}");
+            }
+        }
+
+        private string BuildCustomHtmlEmail(string fullName, string bodyMessage)
+        {
+            return $@"
+            <html>
+                <head>
+                    <style>
+                        body {{
+                            font-family: Arial, sans-serif;
+                            background-color: #f4f4f4;
+                            text-align: center;
+                        }}
+                        .container {{
+                            max-width: 500px;
+                            margin: 20px auto;
+                            padding: 20px;
+                            background-color: #ffffff;
+                            border-radius: 10px;
+                            box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+                        }}
+                        .footer {{
+                            margin-top: 20px;
+                            font-size: 12px;
+                            color: #777;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class='container'>
+                        <h2>Hello, {fullName}</h2>
+                        <p>{bodyMessage}</p>
+                        <div class='footer'>
+                            Graduation Project Team
+                        </div>
+                    </div>
+                </body>
+            </html>";
+        }
 
     }
 }

@@ -784,6 +784,87 @@ namespace GraduationProjectBackendAPI.Controllers.User
             });
         }
 
+        [HttpGet("notifications")]
+        public async Task<IActionResult> GetUserNotifications()
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null)
+                return Unauthorized();
+
+            var notifications = await _context.NotificationT
+                .Where(n => n.UserId == userId)
+                .OrderByDescending(n => n.CreatedAt)
+                .Select(n => new
+                {
+                    n.NotificationId,
+                    n.Message,
+                    n.IsRead,
+                    n.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new { Count = notifications.Count, Notifications = notifications });
+        }
+
+        [HttpGet("notifications/unread-count")]
+        public async Task<IActionResult> GetUnreadNotificationsCount()
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null)
+                return Unauthorized();
+
+            var unreadCount = await _context.NotificationT
+                .CountAsync(n => n.UserId == userId && !n.IsRead);
+
+            return Ok(new { UnreadCount = unreadCount });
+        }
+
+        [HttpPost("notifications/mark-read/{notificationId}")]
+        public async Task<IActionResult> MarkNotificationAsRead(int notificationId)
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null)
+                return Unauthorized();
+
+            var notification = await _context.NotificationT
+                .FirstOrDefaultAsync(n => n.NotificationId == notificationId && n.UserId == userId);
+
+            if (notification == null)
+                return NotFound(new { message = "Notification not found." });
+
+            if (!notification.IsRead)
+            {
+                notification.IsRead = true;
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new { message = "Notification marked as read." });
+        }
+
+        [HttpPost("notifications/mark-all-read")]
+        public async Task<IActionResult> MarkAllNotificationsAsRead()
+        {
+            var userId = GetUserIdFromToken();
+            if (userId == null)
+                return Unauthorized();
+
+            var notifications = await _context.NotificationT
+                .Where(n => n.UserId == userId && !n.IsRead)
+                .ToListAsync();
+
+            if (notifications.Count == 0)
+                return Ok(new { message = "No unread notifications found." });
+
+            foreach (var notification in notifications)
+            {
+                notification.IsRead = true;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "All notifications marked as read." });
+        }
+
         private int? GetUserIdFromToken()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;

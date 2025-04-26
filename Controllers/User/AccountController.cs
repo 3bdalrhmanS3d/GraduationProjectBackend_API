@@ -11,6 +11,7 @@ using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using GraduationProjectBackendAPI.Controllers.DOT.User;
+using GraduationProjectBackendAPI.Controllers.Services;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
@@ -22,12 +23,14 @@ namespace GraduationProjectBackendAPI.Controllers.User
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
         private readonly EmailQueueService _emailQueueService;
+        private readonly FailedLoginTracker _failedLoginTracker;
 
-        public AccountController(AppDbContext context, IConfiguration config, EmailQueueService emailQueueService)
+        public AccountController(AppDbContext context, IConfiguration config, EmailQueueService emailQueueService , FailedLoginTracker failedLoginTracker)
         {
             _context = context;
             _config = config;
             _emailQueueService = emailQueueService;
+            _failedLoginTracker = failedLoginTracker;
         }
 
         #region
@@ -137,6 +140,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 PasswordHash = HashPassword(userInput.PasswordHash),
                 CreatedAt = DateTime.UtcNow,
                 IsSystemProtected = false,
+                IsActive = false,
                 Role = UserRole.RegularUser, 
                 ProfilePhoto = "/uploads/profile-pictures/defult_user.webp"
             };
@@ -196,6 +200,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 return CreateResponse("Verification code expired. Please request a new one.", "error");
             }
 
+            user.IsActive = true;
             user.AccountVerification.CheckedOK = true;
             await _context.SaveChangesAsync();
 
@@ -242,80 +247,71 @@ namespace GraduationProjectBackendAPI.Controllers.User
         public async Task<IActionResult> Signin([FromBody] UserSignInInput userSignInInput)
         {
             if (!ModelState.IsValid)
-            {
                 return Unauthorized(new { message = "Invalid login credentials." });
-            }
 
-            // 1️⃣ Check if the user is already logged in
             string email = userSignInInput.Email;
 
-            // Lock verification 1️⃣ due to repeated failure attempts
-
-            if (_failedLoginAttempts.ContainsKey(email) && _failedLoginAttempts[email].LockoutEnd > DateTime.UtcNow)
+            // 1️ Check lockout due to previous failed attempts
+            var failedAttempts = _failedLoginTracker.GetFailedAttempts();
+            if (failedAttempts.ContainsKey(email) && failedAttempts[email].LockoutEnd > DateTime.UtcNow)
             {
-                return BadRequest($"Too many failed attempts. Try again after {_failedLoginAttempts[email].LockoutEnd - DateTime.UtcNow:mm\\:ss} minutes.");
+                var remaining = failedAttempts[email].LockoutEnd - DateTime.UtcNow;
+                return BadRequest($"Too many failed attempts. Try again after {remaining:mm\\:ss} minutes.");
             }
 
-            // 2️ User search and password verification
-            var existingUser = await _context.UsersT.Include(u => u.AccountVerification)
-                                   .SingleOrDefaultAsync(x => x.EmailAddress == email);
+            // 2️ Retrieve user
+            var existingUser = await _context.UsersT
+                .Include(u => u.AccountVerification)
+                .SingleOrDefaultAsync(x => x.EmailAddress == email);
 
             if (existingUser == null || !VerifyPassword(userSignInInput.Password, existingUser.PasswordHash))
             {
-                //Record attempt failure
-                if (!_failedLoginAttempts.TryGetValue(email, out var attemptData))
-                {
-                    attemptData = (0, DateTime.UtcNow);
-                }
+                _failedLoginTracker.RecordFailedAttempt(email);
 
-                _failedLoginAttempts[email] = (attemptData.Attempts + 1, DateTime.UtcNow);
-
-                //If failed attempts exceed 5, the user is blocked for 15 minutes
-                if (_failedLoginAttempts[email].Attempts >= 5)
+                if (failedAttempts.TryGetValue(email, out var attemptData) && attemptData.Attempts >= 5)
                 {
-                    _failedLoginAttempts[email] = (5, DateTime.UtcNow.AddMinutes(15));
+                    _failedLoginTracker.LockUser(email);
                     return BadRequest("Too many failed login attempts. You are locked out for 15 minutes.");
                 }
 
                 return BadRequest("Invalid login credentials.");
             }
 
-            // 3️ Checking account activation status
-
+            // 3️ Check account verification
             if (existingUser.AccountVerification != null && !existingUser.AccountVerification.CheckedOK)
             {
                 var newVerificationCode = GenerateVerificationCode();
-
                 existingUser.AccountVerification.Code = newVerificationCode;
                 existingUser.AccountVerification.Date = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
-                _emailQueueService.QueueResendEmail(existingUser.EmailAddress, existingUser.FullName , newVerificationCode);
+                _emailQueueService.QueueResendEmail(existingUser.EmailAddress, existingUser.FullName, newVerificationCode);
 
                 return BadRequest("Your account is not verified. A new verification code has been sent to your email.");
             }
 
-            //  4️ Reset attempts to fail when login is successful
-            if (_failedLoginAttempts.ContainsKey(email))
-            {
-                _failedLoginAttempts.Remove(email);
-            }
+            // 4️ Check if account is deleted or deactivated
+            if (existingUser.IsDeleted)
+                return BadRequest(new { message = "This account has been deleted. Please contact support." });
 
-            //  5️ User Visit Registration
-            UserVisitHistory newSignIn = new UserVisitHistory
+            if (!existingUser.IsActive)
+                return BadRequest(new { message = "Your account is not activated." });
+
+            // 5️ Reset failed attempts after successful login
+            _failedLoginTracker.ResetFailedAttempts(email);
+
+            // 6️ Register User Visit
+            _context.UserVisitHistoryT.Add(new UserVisitHistory
             {
                 UserId = existingUser.UserId,
-                LastVisit = DateTime.UtcNow,
-            };
-
-            _context.UserVisitHistoryT.Add(newSignIn);
+                LastVisit = DateTime.UtcNow
+            });
             await _context.SaveChangesAsync();
 
-            // 6️ JWT token generation and sending to user
-
+            // 7️ Generate JWT and Refresh Token
             var tokenDuration = userSignInInput.RememberMe ? TimeSpan.FromDays(30) : TimeSpan.FromHours(3);
 
-            JwtSecurityToken mytoken = GenerateAccessToken(
+            var jwtToken = GenerateAccessToken(
                 existingUser.UserId.ToString(),
                 existingUser.EmailAddress,
                 existingUser.FullName,
@@ -332,16 +328,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
             _context.RefreshTokens.Add(refreshToken);
             await _context.SaveChangesAsync();
 
-
-            var userResponse = new
-            {
-                token = new JwtSecurityTokenHandler().WriteToken(mytoken),
-                expired = mytoken.ValidTo,
-                role = existingUser.Role.ToString(), // User role
-                refreshToken = refreshToken.Token
-            };
-
-            // remmeber me 
+            // 8️ Set Remember Me Cookies if requested
             if (userSignInInput.RememberMe)
             {
                 var cookieOptions = new CookieOptions
@@ -349,15 +336,22 @@ namespace GraduationProjectBackendAPI.Controllers.User
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
-                    Expires = DateTime.UtcNow.AddDays(30) // Set the expiration to 30 days
+                    Expires = DateTime.UtcNow.AddDays(30)
                 };
                 Response.Cookies.Append("UserEmail", existingUser.EmailAddress, cookieOptions);
-                
                 Response.Cookies.Append("UserPassword", userSignInInput.Password, cookieOptions);
             }
 
-            return Ok(userResponse);
+            // 9️ Return Response
+            return Ok(new
+            {
+                token = new JwtSecurityTokenHandler().WriteToken(jwtToken),
+                expired = jwtToken.ValidTo,
+                role = existingUser.Role.ToString(),
+                refreshToken = refreshToken.Token
+            });
         }
+
 
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] string oldRefreshToken)
@@ -411,7 +405,7 @@ namespace GraduationProjectBackendAPI.Controllers.User
 
             var existingUser = await _context.UsersT
                 .Include(u => u.AccountVerification)
-                .SingleOrDefaultAsync(x => x.EmailAddress == email);
+                .SingleOrDefaultAsync(x => x.EmailAddress == email && !x.IsDeleted);
 
             if (existingUser == null || !VerifyPassword(password, existingUser.PasswordHash))
             {
@@ -422,6 +416,17 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (existingUser.AccountVerification != null && !existingUser.AccountVerification.CheckedOK)
             {
                 return BadRequest("Your account is not verified. Please check your email for the verification code.");
+            }
+
+            if (existingUser.IsDeleted == true)
+            {
+                return BadRequest(new { message = "This account has been deleted. Please contact support." });
+
+            }
+
+            if (existingUser.IsActive == false)
+            {
+                return BadRequest(new { message = "Your account is not activated" });
             }
 
             JwtSecurityToken mytoken = GenerateAccessToken(

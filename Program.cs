@@ -1,4 +1,4 @@
-﻿using GraduationProjectBackendAPI.Controllers.User;
+﻿using GraduationProjectBackendAPI.Controllers.Services;
 using GraduationProjectBackendAPI.Models;
 using GraduationProjectBackendAPI.Models.AppDBContext;
 using GraduationProjectBackendAPI.Models.User;
@@ -92,6 +92,7 @@ namespace GraduationProjectBackendAPI
             });
             builder.Services.AddSingleton<EmailQueueService>();
             builder.Services.AddHostedService<EmailQueueBackgroundService>();
+            builder.Services.AddSingleton<FailedLoginTracker>();
 
             builder.Services.AddEndpointsApiExplorer();
   
