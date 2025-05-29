@@ -1,4 +1,4 @@
-﻿namespace GraduationProjectBackendAPI.Controllers.DTO.Courses
+﻿namespace GraduationProjectBackendAPI.DTO.Courses
 {
     public class ReorderContentInput
     {

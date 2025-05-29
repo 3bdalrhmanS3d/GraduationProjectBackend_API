@@ -1,4 +1,4 @@
-﻿namespace GraduationProjectBackendAPI.Controllers.DOT.Courses
+﻿namespace GraduationProjectBackendAPI.DTO.Courses
 {
     public class CourseSkillInput
     {

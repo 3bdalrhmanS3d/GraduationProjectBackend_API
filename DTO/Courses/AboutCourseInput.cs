@@ -1,6 +1,6 @@
 ﻿using GraduationProjectBackendAPI.Models.Courses;
 
-namespace GraduationProjectBackendAPI.Controllers.DOT.Courses
+namespace GraduationProjectBackendAPI.DTO.Courses
 {
     public class AboutCourseInput
     {

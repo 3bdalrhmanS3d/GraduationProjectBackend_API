@@ -1,4 +1,4 @@
-﻿namespace GraduationProjectBackendAPI.Controllers.DTO.User
+﻿namespace GraduationProjectBackendAPI.DTO.User
 {
     public enum NotificationTemplateType
     {

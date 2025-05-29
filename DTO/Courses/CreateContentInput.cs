@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace GraduationProjectBackendAPI.Controllers.DTO.Courses
+namespace GraduationProjectBackendAPI.DTO.Courses
 {
     public enum ContentType
     {

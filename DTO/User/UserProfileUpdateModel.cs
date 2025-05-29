@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace GraduationProjectBackendAPI.Controllers.DOT.User
+namespace GraduationProjectBackendAPI.DTO.User
 {
     public class UserProfileUpdateModel
     {

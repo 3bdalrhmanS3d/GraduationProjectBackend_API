@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace GraduationProjectBackendAPI.Controllers.DOT.Courses
+namespace GraduationProjectBackendAPI.DTO.Courses
 {
     public class UpdateSectionInput
     {

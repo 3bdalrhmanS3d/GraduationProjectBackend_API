@@ -1,6 +1,5 @@
-﻿using GraduationProjectBackendAPI.Controllers.DOT.Courses;
-using GraduationProjectBackendAPI.Controllers.DTO.Courses;
-using GraduationProjectBackendAPI.Controllers.Services;
+﻿using GraduationProjectBackendAPI.Controllers.Services;
+using GraduationProjectBackendAPI.DTO.Courses;
 using GraduationProjectBackendAPI.Models.AppDBContext;
 using GraduationProjectBackendAPI.Models.Courses;
 using GraduationProjectBackendAPI.Models.User;
@@ -958,13 +957,13 @@ namespace GraduationProjectBackendAPI.Controllers.User
             if (section == null)
                 return NotFound(new { message = "Section not found or not yours." });
 
-            if (input.ContentType == DTO.Courses.ContentType.Video && string.IsNullOrWhiteSpace(input.ContentUrl))
+            if (input.ContentType == GraduationProjectBackendAPI.DTO.Courses.ContentType.Video && string.IsNullOrWhiteSpace(input.ContentUrl))
                 return BadRequest(new { message = "Video URL is required for video content." });
 
-            if (input.ContentType == DTO.Courses.ContentType.Doc && string.IsNullOrWhiteSpace(input.ContentDoc))
+            if (input.ContentType == GraduationProjectBackendAPI.DTO.Courses.ContentType.Doc && string.IsNullOrWhiteSpace(input.ContentDoc))
                 return BadRequest(new { message = "Document path is required for doc content." });
 
-            if (input.ContentType == DTO.Courses.ContentType.Text && string.IsNullOrWhiteSpace(input.ContentText))
+            if (input.ContentType == GraduationProjectBackendAPI.DTO.Courses.ContentType.Text && string.IsNullOrWhiteSpace(input.ContentText))
                 return BadRequest(new { message = "Text is required for text content." });
 
             int nextOrder = await _context.Contents
@@ -976,9 +975,9 @@ namespace GraduationProjectBackendAPI.Controllers.User
                 SectionId = input.SectionId,
                 Title = input.Title.Trim(),
                 ContentType = (Models.Courses.ContentType)input.ContentType,
-                ContentText = input.ContentType == DTO.Courses.ContentType.Text ? input.ContentText : null,
-                ContentUrl = input.ContentType == DTO.Courses.ContentType.Video ? input.ContentUrl : null,
-                ContentDoc = input.ContentType == DTO.Courses.ContentType.Doc ? input.ContentDoc : null,
+                ContentText = input.ContentType == GraduationProjectBackendAPI.DTO.Courses.ContentType.Text ? input.ContentText : null,
+                ContentUrl = input.ContentType == GraduationProjectBackendAPI.DTO.Courses.ContentType.Video ? input.ContentUrl : null,
+                ContentDoc = input.ContentType == GraduationProjectBackendAPI.DTO.Courses.ContentType.Doc ? input.ContentDoc : null,
                 DurationInMinutes = input.DurationInMinutes,
                 ContentDescription = input.ContentDescription,
                 ContentOrder = nextOrder
@@ -992,12 +991,12 @@ namespace GraduationProjectBackendAPI.Controllers.User
         }
 
         [HttpPost("upload-content-file")]
-        public async Task<IActionResult> UploadContentFile(IFormFile file, [FromQuery] DTO.Courses.ContentType type)
+        public async Task<IActionResult> UploadContentFile(IFormFile file, [FromQuery] GraduationProjectBackendAPI.DTO.Courses.ContentType type)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { message = "No file uploaded." });
 
-            var folderName = type == DTO.Courses.ContentType.Video ? "videos" : "docs";
+            var folderName = type == GraduationProjectBackendAPI.DTO.Courses.ContentType.Video ? "videos" : "docs";
             var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", folderName);
 
             if (!Directory.Exists(uploadsFolder))

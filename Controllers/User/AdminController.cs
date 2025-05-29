@@ -7,7 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using System;
 using Microsoft.EntityFrameworkCore;
 using GraduationProjectBackendAPI.Controllers.Services;
-using GraduationProjectBackendAPI.Controllers.DTO.User;
+using GraduationProjectBackendAPI.DTO.User;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {

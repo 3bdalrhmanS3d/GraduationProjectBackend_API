@@ -1,4 +1,4 @@
-﻿using GraduationProjectBackendAPI.Controllers.DOT.User;
+﻿using GraduationProjectBackendAPI.DTO.User;
 using GraduationProjectBackendAPI.Models;
 using GraduationProjectBackendAPI.Models.AppDBContext;
 using GraduationProjectBackendAPI.Models.Courses;

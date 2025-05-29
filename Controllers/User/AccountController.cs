@@ -10,8 +10,8 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
-using GraduationProjectBackendAPI.Controllers.DOT.User;
 using GraduationProjectBackendAPI.Controllers.Services;
+using GraduationProjectBackendAPI.DTO.User;
 
 namespace GraduationProjectBackendAPI.Controllers.User
 {
